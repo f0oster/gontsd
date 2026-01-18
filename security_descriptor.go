@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// SecurityDescriptor represents a Windows NT security descriptor (SECURITY_DESCRIPTOR).
 type SecurityDescriptor struct {
 	Revision     uint8
 	Sbz1         uint8
@@ -20,10 +21,12 @@ type SecurityDescriptor struct {
 	DaclOffset  uint32
 }
 
+// Parse parses binary ntSecurityDescriptor data into a SecurityDescriptor.
 func Parse(data []byte) (*SecurityDescriptor, error) {
 	return parseSecurityDescriptor(data)
 }
 
+// ParseToString parses binary ntSecurityDescriptor data and returns a string representation.
 func ParseToString(data []byte) (string, error) {
 	sd, err := parseSecurityDescriptor(data)
 	if err != nil {

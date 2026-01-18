@@ -9,23 +9,19 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-// LDAPSchemaGUIDResolver queries Active Directory for GUID information
+// LDAPSchemaGUIDResolver resolves schema GUIDs by querying Active Directory.
 type LDAPSchemaGUIDResolver struct {
-	conn   *ldap.Conn
-	baseDN string
+	client *LDAPClient
 	cache  map[string]SchemaGUIDInfo
 	mu     sync.RWMutex
 }
 
 var _ SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 
-// NewLDAPSchemaGUIDResolver creates a new GUID resolver using an existing LDAP connection
-// The baseDN should be the root domain DN (e.g., "DC=example,DC=com")
-// This resolver will preload extended rights at creation time for efficiency
-func NewLDAPSchemaGUIDResolver(conn *ldap.Conn, baseDN string) (*LDAPSchemaGUIDResolver, error) {
+// NewLDAPSchemaGUIDResolver creates a new LDAP-backed schema GUID resolver.
+func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, error) {
 	r := &LDAPSchemaGUIDResolver{
-		conn:   conn,
-		baseDN: baseDN,
+		client: client,
 		cache:  make(map[string]SchemaGUIDInfo),
 	}
 
@@ -36,7 +32,6 @@ func NewLDAPSchemaGUIDResolver(conn *ldap.Conn, baseDN string) (*LDAPSchemaGUIDR
 	return r, nil
 }
 
-// ResolveGUID looks up a GUID and returns full SchemaGUIDInfo
 func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
 	normalizedGUID := NormalizeGUID(guid)
 
@@ -56,9 +51,8 @@ func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, erro
 	return nil, ErrSchemaGUIDNotFound
 }
 
-// preloadExtendedRights queries CN=Extended-Rights,CN=Configuration and caches all results
 func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
-	configDN := fmt.Sprintf("CN=Extended-Rights,CN=Configuration,%s", r.baseDN)
+	configDN := fmt.Sprintf("CN=Extended-Rights,CN=Configuration,%s", r.client.BaseDN())
 
 	searchRequest := ldap.NewSearchRequest(
 		configDN,
@@ -70,7 +64,7 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 		nil,
 	)
 
-	sr, err := r.conn.Search(searchRequest)
+	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
 		return fmt.Errorf("LDAP search for extended rights failed: %w", err)
 	}
@@ -90,7 +84,6 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 			name = entry.GetAttributeValue("cn")
 		}
 
-		// Determine type based on validAccesses
 		guidType := determineExtendedRightType(entry.GetAttributeValue("validAccesses"))
 
 		appliesToGUIDs := entry.GetAttributeValues("appliesTo")
@@ -111,7 +104,6 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 	return nil
 }
 
-// ResolveAppliesTo resolves the AppliesTo GUIDs to class names
 func (r *LDAPSchemaGUIDResolver) ResolveAppliesTo(info *SchemaGUIDInfo) []string {
 	if info == nil || len(info.AppliesTo) == 0 {
 		return nil
@@ -119,21 +111,18 @@ func (r *LDAPSchemaGUIDResolver) ResolveAppliesTo(info *SchemaGUIDInfo) []string
 
 	resolved := make([]string, 0, len(info.AppliesTo))
 	for _, classGUID := range info.AppliesTo {
-		// Try to resolve the class GUID to a name
 		classInfo, err := r.ResolveGUID(classGUID)
 		if err == nil && classInfo.Name != "" {
 			resolved = append(resolved, classInfo.Name)
 		} else {
-			// Keep the GUID if we can't resolve it
 			resolved = append(resolved, classGUID)
 		}
 	}
 	return resolved
 }
 
-// querySchema queries CN=Schema,CN=Configuration for attribute/class GUIDs
 func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error) {
-	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.baseDN)
+	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
 
 	// schemaIDGUID is stored as binary, need to convert GUID string to binary escape format
 	binaryFilter := guidStringToBinaryFilter(guid)
@@ -148,7 +137,7 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 		nil,
 	)
 
-	sr, err := r.conn.Search(searchRequest)
+	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
 		return SchemaGUIDInfo{}, fmt.Errorf("LDAP schema search failed: %w", err)
 	}
@@ -163,7 +152,6 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 		name = entry.GetAttributeValue("cn")
 	}
 
-	// Determine if this is an attribute or class
 	guidType := GUIDTypeAttribute
 	for _, oc := range entry.GetAttributeValues("objectClass") {
 		if oc == "classSchema" {
@@ -179,7 +167,6 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 	}, nil
 }
 
-// cacheGUID adds a GUID info to the cache
 func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info SchemaGUIDInfo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// ACL represents an Access Control List containing ACE entries.
 type ACL struct {
 	Revision uint8
 	Sbz1     uint8

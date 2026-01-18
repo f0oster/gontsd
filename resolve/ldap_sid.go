@@ -1,7 +1,6 @@
 package resolve
 
 import (
-	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"sync"
@@ -10,7 +9,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-// LDAPConfig holds LDAP connection settings
+// LDAPConfig holds LDAP connection settings.
 type LDAPConfig struct {
 	Server   string // e.g., "ldap://dc.example.com:389" or "ldaps://dc.example.com:636"
 	BaseDN   string // e.g., "DC=example,DC=com"
@@ -19,64 +18,32 @@ type LDAPConfig struct {
 	UseTLS   bool // Use STARTTLS for ldap:// connections
 }
 
-// LDAPSIDResolver resolves SIDs via LDAP queries to Active Directory
+// LDAPSIDResolver resolves SIDs by querying Active Directory.
 type LDAPSIDResolver struct {
-	config LDAPConfig
-	conn   *ldap.Conn
+	client *LDAPClient
 	cache  map[string]string // SID string -> resolved name
 	mu     sync.RWMutex
 }
 
 var _ SIDResolver = (*LDAPSIDResolver)(nil)
 
-// NewLDAPSIDResolver creates a new resolver with the given config
-func NewLDAPSIDResolver(config LDAPConfig) (*LDAPSIDResolver, error) {
-	var conn *ldap.Conn
-	var err error
-
-	// Connect to LDAP server
-	conn, err = ldap.DialURL(config.Server)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to LDAP server: %w", err)
-	}
-
-	// Upgrade to TLS if requested and not already using ldaps://
-	if config.UseTLS {
-		err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true})
-		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("failed to start TLS: %w", err)
-		}
-	}
-
-	// Bind to the server
-	if config.BindDN != "" {
-		err = conn.Bind(config.BindDN, config.Password)
-		if err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("failed to bind: %w", err)
-		}
-	}
-
+// NewLDAPSIDResolver creates a new LDAP-backed SID resolver.
+func NewLDAPSIDResolver(client *LDAPClient) *LDAPSIDResolver {
 	return &LDAPSIDResolver{
-		config: config,
-		conn:   conn,
+		client: client,
 		cache:  make(map[string]string),
-	}, nil
+	}
 }
 
-// Resolve looks up a SID and returns the account name
 func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	if sid == nil {
 		return "", fmt.Errorf("nil SID")
 	}
 
-	// Check well-known SIDs first
 	if name, ok := WellKnownSIDs[sid.Parsed]; ok {
 		return name, nil
 	}
 
-	// Check cache
 	r.mu.RLock()
 	if name, ok := r.cache[sid.Parsed]; ok {
 		r.mu.RUnlock()
@@ -84,13 +51,11 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	}
 	r.mu.RUnlock()
 
-	// Query AD
 	name, err := r.queryAD(sid)
 	if err != nil {
 		return "", err
 	}
 
-	// Cache result
 	r.mu.Lock()
 	r.cache[sid.Parsed] = name
 	r.mu.Unlock()
@@ -98,7 +63,6 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	return name, nil
 }
 
-// ResolveBatch resolves multiple SIDs efficiently
 func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) (map[string]string, error) {
 	results := make(map[string]string)
 
@@ -108,7 +72,6 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) (map[string]string, e
 		}
 		name, err := r.Resolve(sid)
 		if err != nil {
-			// Store error indicator but continue with other SIDs
 			results[sid.Parsed] = fmt.Sprintf("<error: %v>", err)
 		} else {
 			results[sid.Parsed] = name
@@ -118,26 +81,11 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) (map[string]string, e
 	return results, nil
 }
 
-func (r *LDAPSIDResolver) Close() error {
-	if r.conn != nil {
-		r.conn.Close()
-	}
-	return nil
-}
-
-// GetConn returns the underlying LDAP connection for use by other resolvers
-func (r *LDAPSIDResolver) GetConn() *ldap.Conn {
-	return r.conn
-}
-
-// queryAD queries Active Directory for the SID
 func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
-	// Convert SID to binary format for LDAP query
 	binarySID := sidToBinaryString(sid.Raw)
 
-	// Search for the object with this SID
 	searchRequest := ldap.NewSearchRequest(
-		r.config.BaseDN,
+		r.client.BaseDN(),
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
 		0, 0, false,
@@ -146,7 +94,7 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 		nil,
 	)
 
-	sr, err := r.conn.Search(searchRequest)
+	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
 		return "", fmt.Errorf("LDAP search failed: %w", err)
 	}
@@ -156,8 +104,6 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 	}
 
 	entry := sr.Entries[0]
-
-	// Build result with sAMAccountName and distinguishedName
 	samName := entry.GetAttributeValue("sAMAccountName")
 	dn := entry.GetAttributeValue("distinguishedName")
 
@@ -176,8 +122,7 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 	return "", fmt.Errorf("no name attributes found for SID: %s", sid.Parsed)
 }
 
-// sidToBinaryString converts a raw SID to LDAP binary string format
-// Each byte is escaped as \XX where XX is the hex value
+// sidToBinaryString converts a raw SID to LDAP binary escape format (\XX per byte)
 func sidToBinaryString(raw []byte) string {
 	result := ""
 	for _, b := range raw {
@@ -186,23 +131,20 @@ func sidToBinaryString(raw []byte) string {
 	return result
 }
 
-// SIDFromString parses a SID string (e.g., "S-1-5-21-...") and returns the binary representation
+// SIDFromString parses a SID string (e.g., "S-1-5-21-...") into binary format.
 func SIDFromString(sidStr string) ([]byte, error) {
 	var revision uint8
 	var identifierAuthority uint64
 	var subAuthorities []uint32
 
-	// Parse the SID string
 	var subAuthStr string
 	n, err := fmt.Sscanf(sidStr, "S-%d-%d-%s", &revision, &identifierAuthority, &subAuthStr)
 	if err != nil && n < 2 {
 		return nil, fmt.Errorf("invalid SID format: %s", sidStr)
 	}
 
-	// Parse sub-authorities if present
 	if n >= 3 && subAuthStr != "" {
 		remaining := sidStr
-		// Skip "S-R-IA-"
 		for i := 0; i < 3; i++ {
 			for j := 0; j < len(remaining); j++ {
 				if remaining[j] == '-' {
@@ -212,7 +154,6 @@ func SIDFromString(sidStr string) ([]byte, error) {
 			}
 		}
 
-		// Parse remaining sub-authorities
 		for remaining != "" {
 			var subAuth uint32
 			var consumed int

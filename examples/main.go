@@ -41,7 +41,7 @@ func main() {
 	var guidResolver resolve.SchemaGUIDResolver = resolve.WellKnownSchemaGUIDResolver{}
 
 	if *ldapServer != "" {
-		ldapResolver, err := resolve.NewLDAPSIDResolver(resolve.LDAPConfig{
+		client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
 			Server:   *ldapServer,
 			BaseDN:   *ldapBaseDN,
 			BindDN:   *ldapBindDN,
@@ -51,15 +51,16 @@ func main() {
 		if err != nil {
 			fmt.Printf("Warning: Failed to connect to LDAP: %v\n", err)
 		} else {
-			defer ldapResolver.Close()
+			defer client.Close()
+			sidResolver := resolve.NewLDAPSIDResolver(client)
 			resolver = resolve.ChainSIDResolver{
 				Resolvers: []resolve.SIDResolver{
 					resolve.WellKnownSIDResolver{},
-					ldapResolver,
+					sidResolver,
 				},
 			}
 
-			ldapGUIDResolver, err := resolve.NewLDAPSchemaGUIDResolver(ldapResolver.GetConn(), *ldapBaseDN)
+			ldapGUIDResolver, err := resolve.NewLDAPSchemaGUIDResolver(client)
 			if err != nil {
 				fmt.Printf("Warning: Failed to create LDAP GUID resolver: %v\n", err)
 			} else {

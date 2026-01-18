@@ -5,8 +5,10 @@ import (
 	"strings"
 )
 
+// ErrSchemaGUIDNotFound is returned when a GUID cannot be resolved.
 var ErrSchemaGUIDNotFound = errors.New("GUID not found")
 
+// SchemaGUIDInfo contains metadata about a resolved schema GUID.
 type SchemaGUIDInfo struct {
 	Name        string
 	Type        string // extendedRight, propertySet, attribute, class, validatedWrite
@@ -15,20 +17,24 @@ type SchemaGUIDInfo struct {
 	AppliesTo   []string
 }
 
+// SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
 type SchemaGUIDResolver interface {
 	ResolveGUID(guid string) (*SchemaGUIDInfo, error)
 }
 
+// NormalizeGUID converts a GUID to uppercase for consistent comparison.
 func NormalizeGUID(guid string) string {
 	return strings.ToUpper(guid)
 }
 
+// NoOpSchemaGUIDResolver is a resolver that always returns ErrSchemaGUIDNotFound.
 type NoOpSchemaGUIDResolver struct{}
 
 func (NoOpSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
 	return nil, ErrSchemaGUIDNotFound
 }
 
+// ChainSchemaGUIDResolver tries multiple resolvers in order until one succeeds.
 type ChainSchemaGUIDResolver struct {
 	Resolvers []SchemaGUIDResolver
 }
@@ -43,6 +49,7 @@ func (c ChainSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, erro
 	return nil, ErrSchemaGUIDNotFound
 }
 
+// WellKnownSchemaGUIDResolver resolves GUIDs using a built-in table of well-known values.
 type WellKnownSchemaGUIDResolver struct{}
 
 func (WellKnownSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {

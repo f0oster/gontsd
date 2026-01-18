@@ -2,6 +2,7 @@ package gontsd
 
 import "bytes"
 
+// DiffType represents the type of change detected between two ACEs.
 type DiffType int
 
 const (
@@ -26,6 +27,7 @@ func (d DiffType) String() string {
 	}
 }
 
+// ACEDiff represents a single change to an ACE.
 type ACEDiff struct {
 	Type     DiffType
 	Position int // Index in the ACL
@@ -33,6 +35,7 @@ type ACEDiff struct {
 	NewACE   ACE // nil if Removed
 }
 
+// ACLDiff represents the changes between two ACLs.
 type ACLDiff struct {
 	RevisionChanged bool
 	OldRevision     uint8
@@ -40,6 +43,7 @@ type ACLDiff struct {
 	ACEDiffs        []ACEDiff
 }
 
+// DiffResult contains all changes detected between two SecurityDescriptors.
 type DiffResult struct {
 	OwnerChanged bool
 	OldOwner     *SID
@@ -57,6 +61,7 @@ type DiffResult struct {
 	NewControlFlags     uint16
 }
 
+// HasChanges returns true if any differences were detected.
 func (d *DiffResult) HasChanges() bool {
 	if d == nil {
 		return false
@@ -65,6 +70,7 @@ func (d *DiffResult) HasChanges() bool {
 		d.DACLDiff != nil || d.SACLDiff != nil
 }
 
+// Compare compares two SecurityDescriptors and returns the differences.
 func Compare(old, new *SecurityDescriptor) *DiffResult {
 	result := &DiffResult{}
 

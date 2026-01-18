@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/78eb9013-1c3a-4970-ad1f-2b1dad588a25
+// SID represents a Windows Security Identifier.
+// See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/78eb9013-1c3a-4970-ad1f-2b1dad588a25
 type SID struct {
 	Raw          []byte
 	Parsed       string

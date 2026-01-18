@@ -6,9 +6,8 @@ import (
 	"github.com/f0oster/gontsd"
 )
 
-// https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
-// https://github.com/fishilico/shared/blob/master/windows/well_known_sids.c
-
+// Well-known SID constants.
+// See: https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
 const (
 	// Placeholder and filter SIDs
 	WELLKNOWNSID_NOBODY               = "S-1-0-0"
@@ -102,6 +101,7 @@ const (
 	WELLKNOWNSID_SECURITY_MANDATORY_LABEL_SECURE_PROCESS              = "S-1-16-28672"
 )
 
+// WellKnownSIDs maps SID strings to human-readable names.
 var WellKnownSIDs = map[string]string{
 	// Placeholder and filter SIDs
 	WELLKNOWNSID_NOBODY:               "Nobody",
@@ -195,10 +195,12 @@ var WellKnownSIDs = map[string]string{
 	WELLKNOWNSID_SECURITY_MANDATORY_LABEL_SECURE_PROCESS:              "Secure Process",
 }
 
+// SIDResolver resolves SIDs to human-readable names.
 type SIDResolver interface {
 	Resolve(sid *gontsd.SID) (name string, err error)
 }
 
+// WellKnownSIDResolver resolves SIDs using the built-in WellKnownSIDs table.
 type WellKnownSIDResolver struct{}
 
 func (WellKnownSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
@@ -211,7 +213,7 @@ func (WellKnownSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	return "", fmt.Errorf("unknown SID: %s", sid.Parsed)
 }
 
-// ChainSIDResolver tries multiple resolvers in order
+// ChainSIDResolver tries multiple resolvers in order until one succeeds.
 type ChainSIDResolver struct {
 	Resolvers []SIDResolver
 }

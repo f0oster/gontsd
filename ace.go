@@ -16,13 +16,15 @@ const (
 	ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE  = 0x0C
 )
 
-// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+// ACEHeader is the common header for all ACE types.
+// See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
 type ACEHeader struct {
 	AceType  uint8
 	AceFlags uint8
 	AceSize  uint16
 }
 
+// ACE is the interface implemented by all Access Control Entry types.
 type ACE interface {
 	Type() uint8
 	Size() uint16
@@ -87,6 +89,7 @@ func (b *baseObjectACE) GetInheritedObjectTypeGUID() string {
 	return guid
 }
 
+// AccessAllowedACE grants access rights to a trustee.
 type AccessAllowedACE struct {
 	baseACE
 }
@@ -99,6 +102,7 @@ func (a *AccessAllowedACE) String() string {
 }`, a.Mask, a.SID, a.Flags)
 }
 
+// AccessDeniedACE denies access rights to a trustee.
 type AccessDeniedACE struct {
 	baseACE
 }
@@ -111,6 +115,7 @@ func (a *AccessDeniedACE) String() string {
 }`, a.Mask, a.SID, a.Flags)
 }
 
+// AccessAllowedObjectACE grants access rights to a trustee for a specific object type or property.
 type AccessAllowedObjectACE struct {
 	baseObjectACE
 }
@@ -123,6 +128,7 @@ func (a *AccessAllowedObjectACE) String() string {
 }`, a.Mask, a.SID, a.FlagStrings)
 }
 
+// AccessDeniedObjectACE denies access rights to a trustee for a specific object type or property.
 type AccessDeniedObjectACE struct {
 	baseObjectACE
 }
@@ -151,6 +157,7 @@ func (a *AccessAllowedCallbackACE) String() string {
 }`, a.Mask, a.SID, a.Flags, len(a.ApplicationData))
 }
 
+// AccessDeniedCallbackACE denies access rights with a conditional expression.
 type AccessDeniedCallbackACE struct {
 	baseACE
 	ApplicationData []byte
@@ -165,6 +172,7 @@ func (a *AccessDeniedCallbackACE) String() string {
 }`, a.Mask, a.SID, a.Flags, len(a.ApplicationData))
 }
 
+// AccessAllowedCallbackObjectACE grants access rights to a specific object type with a conditional expression.
 type AccessAllowedCallbackObjectACE struct {
 	baseObjectACE
 	ApplicationData []byte
@@ -179,6 +187,7 @@ func (a *AccessAllowedCallbackObjectACE) String() string {
 }`, a.Mask, a.SID, a.FlagStrings, len(a.ApplicationData))
 }
 
+// AccessDeniedCallbackObjectACE denies access rights to a specific object type with a conditional expression.
 type AccessDeniedCallbackObjectACE struct {
 	baseObjectACE
 	ApplicationData []byte
