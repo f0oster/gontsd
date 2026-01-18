@@ -60,24 +60,34 @@ import "github.com/f0oster/gontsd/resolve"
 resolver := resolve.WellKnownSIDResolver{}
 name, _ := resolver.Resolve(sid) // "BUILTIN\Administrators"
 
-// LDAP resolver for domain SIDs
-ldapResolver, _ := resolve.NewLDAPSIDResolver(resolve.LDAPConfig{
-    Server:   "ldap://dc.example.com:389",
+// LDAP client for domain resolution
+client, _ := resolve.NewLDAPClient(resolve.LDAPConfig{
+    Server:   "ldaps://dc.example.com:636",
     BaseDN:   "DC=example,DC=com",
     BindDN:   "CN=user,DC=example,DC=com",
     Password: "password",
 })
-defer ldapResolver.Close()
+defer client.Close()
 
-name, _ := ldapResolver.Resolve(sid) // "DOMAIN\username"
+// SID resolver
+sidResolver := resolve.NewLDAPSIDResolver(client)
+name, _ := sidResolver.Resolve(sid) // "jsmith (CN=jsmith,OU=Users,DC=example,DC=com)"
+
+// Schema GUID resolver (extended rights, property sets, attributes)
+guidResolver, _ := resolve.NewLDAPSchemaGUIDResolver(client)
+info, _ := guidResolver.ResolveGUID("1131f6ad-9c07-11d1-f79f-00c04fc2dcd2")
+// info.Name: "DS-Replication-Get-Changes-All"
+// info.Type: "extendedRight"
 ```
 
 ## Examples
 
-See the [examples](./examples) directory for a complete working example including:
+See the [examples](./examples) directory for a complete example:
 - Parsing and dumping security descriptors
 - Comparing two security descriptors
 - SID and GUID resolution with LDAP
+
+Sample output showing resolved SIDs, GUIDs, and ACE diffs, can be seen in [examples/sample_output.md](./examples/sample_output.md).
 
 ```bash
 # Run with well-known SIDs only
