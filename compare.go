@@ -89,6 +89,18 @@ func (d *DiffResult) HasChanges() bool {
 }
 
 // Compare compares two SecurityDescriptors and returns the differences.
+// It detects changes to the owner, group, control flags, DACL, and SACL.
+// Individual ACE changes are classified as added, removed, modified,
+// reordered, or a combination. Either argument may be nil.
+//
+//	diff := gontsd.Compare(oldSD, newSD)
+//	if diff.HasChanges() {
+//	    for _, d := range diff.DACLDiff.ACEDiffs {
+//	        if d.Type.Has(gontsd.DiffModified) {
+//	            fmt.Printf("modified: %s\n", d.NewACE.GetSID().Parsed)
+//	        }
+//	    }
+//	}
 func Compare(old, new *SecurityDescriptor) *DiffResult {
 	if old == nil && new == nil {
 		return &DiffResult{}

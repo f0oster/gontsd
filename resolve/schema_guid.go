@@ -24,6 +24,10 @@ type SchemaGUIDInfo struct {
 }
 
 // SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
+// Implementations include [WellKnownSchemaGUIDResolver] for well-known schema
+// classes, attributes, and extended rights, [LDAPSchemaGUIDResolver] for Active
+// Directory schema lookups, and [ChainSchemaGUIDResolver] to try multiple
+// resolvers in order.
 type SchemaGUIDResolver interface {
 	ResolveGUID(guid string) (*SchemaGUIDInfo, error)
 }

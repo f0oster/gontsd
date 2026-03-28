@@ -183,6 +183,9 @@ var domainRelativeRIDs = map[string]string{
 }
 
 // SIDResolver resolves SIDs to human-readable names.
+// Implementations include [WellKnownSIDResolver] for built-in Windows SIDs,
+// [LDAPSIDResolver] for Active Directory lookups, and [ChainSIDResolver]
+// to try multiple resolvers in order.
 type SIDResolver interface {
 	Resolve(sid *gontsd.SID) (name string, err error)
 }
@@ -230,8 +233,9 @@ type BatchSIDResolver interface {
 }
 
 // ResolveBatchSIDs resolves multiple SIDs using the given resolver.
-// If the resolver (or any resolver in a chain) supports batching,
-// it will be used. Otherwise falls back to individual Resolve calls.
+// If the resolver (or any resolver in a chain) implements [BatchSIDResolver],
+// SIDs are resolved in bulk LDAP queries. Otherwise it falls back to
+// individual Resolve calls. Results are keyed by SID string.
 func ResolveBatchSIDs(resolver SIDResolver, sids []*gontsd.SID) map[string]SIDResult {
 	if br, ok := findBatchResolver(resolver); ok {
 		return br.ResolveBatch(sids)

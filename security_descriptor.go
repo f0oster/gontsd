@@ -22,11 +22,21 @@ type SecurityDescriptor struct {
 }
 
 // Parse parses binary ntSecurityDescriptor data into a SecurityDescriptor.
+// The input should be the raw bytes of an NT security descriptor as stored
+// in Active Directory's ntSecurityDescriptor attribute or a file system
+// security descriptor. Returns an error if the data is malformed or too short.
+//
+//	sd, err := gontsd.Parse(rawBytes)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(sd.OwnerSID.Parsed) // e.g. "S-1-5-32-544"
 func Parse(data []byte) (*SecurityDescriptor, error) {
 	return parseSecurityDescriptor(data)
 }
 
-// ParseToString parses binary ntSecurityDescriptor data and returns a string representation.
+// ParseToString is a convenience wrapper that parses and returns the
+// string representation of the security descriptor.
 func ParseToString(data []byte) (string, error) {
 	sd, err := parseSecurityDescriptor(data)
 	if err != nil {
