@@ -62,22 +62,127 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	return name, nil
 }
 
-func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) (map[string]string, error) {
-	results := make(map[string]string)
+const maxSIDsPerQuery = 50
 
+// SIDResult holds the outcome of resolving a single SID.
+type SIDResult struct {
+	Name string
+	Err  error
+}
+
+// ResolveBatch resolves multiple SIDs, using a single LDAP query per batch
+// of uncached SIDs. Results are keyed by SID string (e.g. "S-1-5-21-...").
+func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) map[string]SIDResult {
+	results := make(map[string]SIDResult, len(sids))
+
+	// Partition into cached/resolved and needing LDAP lookup.
+	var needQuery []*gontsd.SID
+	r.mu.RLock()
 	for _, sid := range sids {
 		if sid == nil {
 			continue
 		}
-		name, err := r.Resolve(sid)
-		if err != nil {
-			results[sid.Parsed] = fmt.Sprintf("<error: %v>", err)
+		if name, ok := r.cache[sid.Parsed]; ok {
+			results[sid.Parsed] = SIDResult{Name: name}
 		} else {
-			results[sid.Parsed] = name
+			needQuery = append(needQuery, sid)
 		}
 	}
+	r.mu.RUnlock()
 
-	return results, nil
+	// Batch LDAP queries in groups.
+	for i := 0; i < len(needQuery); i += maxSIDsPerQuery {
+		end := i + maxSIDsPerQuery
+		if end > len(needQuery) {
+			end = len(needQuery)
+		}
+		r.queryBatch(needQuery[i:end], results)
+	}
+
+	return results
+}
+
+func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]SIDResult) {
+	if len(sids) == 0 {
+		return
+	}
+
+	// Build OR filter: (|(objectSid=\xx...)(...))
+	sidByBinary := make(map[string]*gontsd.SID, len(sids))
+	var filterParts []string
+	for _, sid := range sids {
+		binarySID := sidToBinaryString(sid.Raw)
+		sidByBinary[binarySID] = sid
+		filterParts = append(filterParts, fmt.Sprintf("(objectSid=%s)", binarySID))
+	}
+
+	filter := filterParts[0]
+	if len(filterParts) > 1 {
+		filter = fmt.Sprintf("(|%s)", strings.Join(filterParts, ""))
+	}
+
+	searchRequest := ldap.NewSearchRequest(
+		r.client.BaseDN(),
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		filter,
+		[]string{"objectSid", "sAMAccountName", "distinguishedName", "name"},
+		nil,
+	)
+
+	sr, err := r.client.Conn().Search(searchRequest)
+	if err != nil {
+		// Mark all SIDs in this batch as failed.
+		for _, sid := range sids {
+			results[sid.Parsed] = SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
+		}
+		return
+	}
+
+	// Map results back by matching objectSid.
+	found := make(map[string]bool)
+	for _, entry := range sr.Entries {
+		rawSid := entry.GetRawAttributeValue("objectSid")
+		binarySID := sidToBinaryString(rawSid)
+		sid, ok := sidByBinary[binarySID]
+		if !ok {
+			continue
+		}
+		found[sid.Parsed] = true
+
+		resolvedName := extractName(entry)
+		results[sid.Parsed] = SIDResult{Name: resolvedName}
+
+		r.mu.Lock()
+		r.cache[sid.Parsed] = resolvedName
+		r.mu.Unlock()
+	}
+
+	// Mark SIDs with no LDAP result.
+	for _, sid := range sids {
+		if !found[sid.Parsed] {
+			results[sid.Parsed] = SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Parsed)}
+		}
+	}
+}
+
+func extractName(entry *ldap.Entry) string {
+	samName := entry.GetAttributeValue("sAMAccountName")
+	dn := entry.GetAttributeValue("distinguishedName")
+	if samName != "" && dn != "" {
+		return fmt.Sprintf("%s (%s)", samName, dn)
+	}
+	if samName != "" {
+		return samName
+	}
+	if dn != "" {
+		return dn
+	}
+	if name := entry.GetAttributeValue("name"); name != "" {
+		return name
+	}
+	return ""
 }
 
 func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
@@ -102,23 +207,11 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 		return "", fmt.Errorf("SID not found in AD: %s", sid.Parsed)
 	}
 
-	entry := sr.Entries[0]
-	samName := entry.GetAttributeValue("sAMAccountName")
-	dn := entry.GetAttributeValue("distinguishedName")
-
-	if samName != "" && dn != "" {
-		return fmt.Sprintf("%s (%s)", samName, dn), nil
+	name := extractName(sr.Entries[0])
+	if name == "" {
+		return "", fmt.Errorf("no name attributes found for SID: %s", sid.Parsed)
 	}
-	if samName != "" {
-		return samName, nil
-	}
-	if dn != "" {
-		return dn, nil
-	}
-	if name := entry.GetAttributeValue("name"); name != "" {
-		return name, nil
-	}
-	return "", fmt.Errorf("no name attributes found for SID: %s", sid.Parsed)
+	return name, nil
 }
 
 // sidToBinaryString converts a raw SID to LDAP binary escape format (\XX per byte)
