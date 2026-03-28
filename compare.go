@@ -1,6 +1,9 @@
 package gontsd
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 // DiffType represents the type of change detected between two ACEs.
 type DiffType int
@@ -266,30 +269,11 @@ type indexedACE struct {
 }
 
 func aceIdentity(ace ACE) string {
-	return aceTypePrefix(ace) + ":" + ace.GetSID().Parsed
-}
-
-func aceTypePrefix(ace ACE) string {
-	switch ace.(type) {
-	case *AccessAllowedACE:
-		return "allowed"
-	case *AccessDeniedACE:
-		return "denied"
-	case *AccessAllowedObjectACE:
-		return "allowed-object"
-	case *AccessDeniedObjectACE:
-		return "denied-object"
-	case *AccessAllowedCallbackACE:
-		return "allowed-callback"
-	case *AccessDeniedCallbackACE:
-		return "denied-callback"
-	case *AccessAllowedCallbackObjectACE:
-		return "allowed-callback-object"
-	case *AccessDeniedCallbackObjectACE:
-		return "denied-callback-object"
-	default:
-		return "unknown"
+	sid := ace.GetSID()
+	if sid == nil {
+		return fmt.Sprintf("0x%02X:<nil>", ace.Type())
 	}
+	return fmt.Sprintf("0x%02X:%s", ace.Type(), sid.Parsed)
 }
 
 func aceEqual(a, b ACE) bool {
@@ -302,209 +286,61 @@ func aceEqual(a, b ACE) bool {
 	if a.Type() != b.Type() {
 		return false
 	}
+	if a.GetMask() != b.GetMask() {
+		return false
+	}
+	if !sidEqual(a.GetSID(), b.GetSID()) {
+		return false
+	}
+	if aceFlags(a) != aceFlags(b) {
+		return false
+	}
+	if a.GetObjectTypeGUID() != b.GetObjectTypeGUID() {
+		return false
+	}
+	if a.GetInheritedObjectTypeGUID() != b.GetInheritedObjectTypeGUID() {
+		return false
+	}
+	if !bytes.Equal(aceAppData(a), aceAppData(b)) {
+		return false
+	}
+	return true
+}
 
-	switch aTyped := a.(type) {
+func aceFlags(a ACE) uint8 {
+	switch v := a.(type) {
 	case *AccessAllowedACE:
-		bTyped, ok := b.(*AccessAllowedACE)
-		if !ok {
-			return false
-		}
-		return accessAllowedACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessDeniedACE:
-		bTyped, ok := b.(*AccessDeniedACE)
-		if !ok {
-			return false
-		}
-		return accessDeniedACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessAllowedObjectACE:
-		bTyped, ok := b.(*AccessAllowedObjectACE)
-		if !ok {
-			return false
-		}
-		return accessAllowedObjectACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessDeniedObjectACE:
-		bTyped, ok := b.(*AccessDeniedObjectACE)
-		if !ok {
-			return false
-		}
-		return accessDeniedObjectACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessAllowedCallbackACE:
-		bTyped, ok := b.(*AccessAllowedCallbackACE)
-		if !ok {
-			return false
-		}
-		return accessAllowedCallbackACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessDeniedCallbackACE:
-		bTyped, ok := b.(*AccessDeniedCallbackACE)
-		if !ok {
-			return false
-		}
-		return accessDeniedCallbackACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessAllowedCallbackObjectACE:
-		bTyped, ok := b.(*AccessAllowedCallbackObjectACE)
-		if !ok {
-			return false
-		}
-		return accessAllowedCallbackObjectACEEqual(aTyped, bTyped)
+		return v.Header.AceFlags
 	case *AccessDeniedCallbackObjectACE:
-		bTyped, ok := b.(*AccessDeniedCallbackObjectACE)
-		if !ok {
-			return false
-		}
-		return accessDeniedCallbackObjectACEEqual(aTyped, bTyped)
-	default:
-		return false
+		return v.Header.AceFlags
+	case *RawACE:
+		return v.Header.AceFlags
 	}
+	return 0
 }
 
-func accessAllowedACEEqual(a, b *AccessAllowedACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
+func aceAppData(a ACE) []byte {
+	switch v := a.(type) {
+	case *AccessAllowedCallbackACE:
+		return v.ApplicationData
+	case *AccessDeniedCallbackACE:
+		return v.ApplicationData
+	case *AccessAllowedCallbackObjectACE:
+		return v.ApplicationData
+	case *AccessDeniedCallbackObjectACE:
+		return v.ApplicationData
 	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessDeniedACEEqual(a, b *AccessDeniedACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessAllowedObjectACEEqual(a, b *AccessAllowedObjectACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if a.ObjectFlags != b.ObjectFlags {
-		return false
-	}
-	if !bytes.Equal(a.ObjectType[:], b.ObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.InheritedObjectType[:], b.InheritedObjectType[:]) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessDeniedObjectACEEqual(a, b *AccessDeniedObjectACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if a.ObjectFlags != b.ObjectFlags {
-		return false
-	}
-	if !bytes.Equal(a.ObjectType[:], b.ObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.InheritedObjectType[:], b.InheritedObjectType[:]) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessAllowedCallbackACEEqual(a, b *AccessAllowedCallbackACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if !bytes.Equal(a.ApplicationData, b.ApplicationData) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessDeniedCallbackACEEqual(a, b *AccessDeniedCallbackACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if !bytes.Equal(a.ApplicationData, b.ApplicationData) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessAllowedCallbackObjectACEEqual(a, b *AccessAllowedCallbackObjectACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if a.ObjectFlags != b.ObjectFlags {
-		return false
-	}
-	if !bytes.Equal(a.ObjectType[:], b.ObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.InheritedObjectType[:], b.InheritedObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.ApplicationData, b.ApplicationData) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
-}
-
-func accessDeniedCallbackObjectACEEqual(a, b *AccessDeniedCallbackObjectACE) bool {
-	if a.Header.AceType != b.Header.AceType {
-		return false
-	}
-	if a.Header.AceFlags != b.Header.AceFlags {
-		return false
-	}
-	if a.Mask != b.Mask {
-		return false
-	}
-	if a.ObjectFlags != b.ObjectFlags {
-		return false
-	}
-	if !bytes.Equal(a.ObjectType[:], b.ObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.InheritedObjectType[:], b.InheritedObjectType[:]) {
-		return false
-	}
-	if !bytes.Equal(a.ApplicationData, b.ApplicationData) {
-		return false
-	}
-	return sidEqual(a.SID, b.SID)
+	return nil
 }
