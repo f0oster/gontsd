@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/f0oster/gontsd"
 )
@@ -167,23 +168,6 @@ var WellKnownSIDs = map[string]string{
 	WELLKNOWNSID_NT_AUTHORITY_SCHANNEL_AUTHENTICATION:       "SChannel Authentication",
 	WELLKNOWNSID_NT_AUTHORITY_DIGEST_AUTHENTICATION:         "Digest Authentication",
 
-	// Domain SIDs
-	WELLKNOWNSID_DOMAIN_ADMINISTRATOR_ACCOUNT:        "Administrator Account",
-	WELLKNOWNSID_DOMAIN_GUEST_ACCOUNT:                "Guest Account",
-	WELLKNOWNSID_DOMAIN_KRBTGT_ACCOUNT:               "KRBTGT Account",
-	WELLKNOWNSID_DOMAIN_ADMINS:                       "Domain Admins",
-	WELLKNOWNSID_DOMAIN_USERS:                        "Domain Users",
-	WELLKNOWNSID_DOMAIN_GUESTS:                       "Domain Guests",
-	WELLKNOWNSID_DOMAIN_COMPUTERS:                    "Domain Computers",
-	WELLKNOWNSID_DOMAIN_CONTROLLERS:                  "Domain Controllers",
-	WELLKNOWNSID_DOMAIN_CERT_PUBLISHERS:              "Cert Publishers",
-	WELLKNOWNSID_DOMAIN_SCHEMA_ADMINS:                "Schema Admins",
-	WELLKNOWNSID_DOMAIN_ENTERPRISE_ADMINS:            "Enterprise Admins",
-	WELLKNOWNSID_DOMAIN_GROUP_POLICY_CREATOR_OWNERS:  "Group Policy Creator Owners",
-	WELLKNOWNSID_DOMAIN_READ_ONLY_DOMAIN_CONTROLLERS: "Read-Only Domain Controllers",
-	WELLKNOWNSID_DOMAIN_CLONEABLE_DOMAIN_CONTROLLERS: "Cloneable Domain Controllers",
-	WELLKNOWNSID_DOMAIN_RAS_SERVERS_GROUP:            "RAS Servers Group",
-
 	// Mandatory integrity levels
 	WELLKNOWNSID_SECURITY_MANDATORY_LABEL_UNTRUSTED_LEVEL:             "Untrusted Level",
 	WELLKNOWNSID_SECURITY_MANDATORY_LABEL_LOW_INTEGRITY_LEVEL:         "Low Integrity Level",
@@ -195,12 +179,33 @@ var WellKnownSIDs = map[string]string{
 	WELLKNOWNSID_SECURITY_MANDATORY_LABEL_SECURE_PROCESS:              "Secure Process",
 }
 
+// domainRelativeRIDs maps well-known RIDs to names for domain SIDs (S-1-5-21-*).
+// See: https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+var domainRelativeRIDs = map[string]string{
+	"500": "Administrator",
+	"501": "Guest",
+	"502": "KRBTGT",
+	"512": "Domain Admins",
+	"513": "Domain Users",
+	"514": "Domain Guests",
+	"515": "Domain Computers",
+	"516": "Domain Controllers",
+	"517": "Cert Publishers",
+	"518": "Schema Admins",
+	"519": "Enterprise Admins",
+	"520": "Group Policy Creator Owners",
+	"521": "Read-Only Domain Controllers",
+	"522": "Cloneable Domain Controllers",
+	"553": "RAS Servers",
+}
+
 // SIDResolver resolves SIDs to human-readable names.
 type SIDResolver interface {
 	Resolve(sid *gontsd.SID) (name string, err error)
 }
 
-// WellKnownSIDResolver resolves SIDs using the built-in WellKnownSIDs table.
+// WellKnownSIDResolver resolves SIDs using the built-in WellKnownSIDs table
+// and domain-relative RID matching for S-1-5-21-* SIDs.
 type WellKnownSIDResolver struct{}
 
 func (WellKnownSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
@@ -209,6 +214,14 @@ func (WellKnownSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	}
 	if name, ok := WellKnownSIDs[sid.Parsed]; ok {
 		return name, nil
+	}
+	if strings.HasPrefix(sid.Parsed, "S-1-5-21-") {
+		if i := strings.LastIndex(sid.Parsed, "-"); i >= 0 {
+			rid := sid.Parsed[i+1:]
+			if name, ok := domainRelativeRIDs[rid]; ok {
+				return name, nil
+			}
+		}
 	}
 	return "", fmt.Errorf("unknown SID: %s", sid.Parsed)
 }
