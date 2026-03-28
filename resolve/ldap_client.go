@@ -21,7 +21,7 @@ func NewLDAPClient(config LDAPConfig) (*LDAPClient, error) {
 	}
 
 	if config.UseTLS {
-		err = conn.StartTLS(&tls.Config{InsecureSkipVerify: true})
+		err = conn.StartTLS(&tls.Config{InsecureSkipVerify: config.InsecureSkipVerify})
 		if err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("failed to start TLS: %w", err)

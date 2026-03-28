@@ -13,11 +13,12 @@ import (
 
 // LDAPConfig holds LDAP connection settings.
 type LDAPConfig struct {
-	Server   string // e.g., "ldap://dc.example.com:389" or "ldaps://dc.example.com:636"
-	BaseDN   string // e.g., "DC=example,DC=com"
-	BindDN   string // e.g., "CN=admin,DC=example,DC=com"
-	Password string
-	UseTLS   bool // Use STARTTLS for ldap:// connections
+	Server             string // e.g., "ldap://dc.example.com:389" or "ldaps://dc.example.com:636"
+	BaseDN             string // e.g., "DC=example,DC=com"
+	BindDN             string // e.g., "CN=admin,DC=example,DC=com"
+	Password           string
+	UseTLS             bool // Use STARTTLS for ldap:// connections
+	InsecureSkipVerify bool // Skip TLS certificate verification
 }
 
 // LDAPSIDResolver resolves SIDs by querying Active Directory.

@@ -35,6 +35,7 @@ func main() {
 	ldapBindDN := flag.String("ldap-binddn", "", "LDAP bind DN")
 	ldapPassword := flag.String("ldap-password", "", "LDAP password")
 	ldapTLS := flag.Bool("ldap-tls", false, "Use STARTTLS")
+	ldapInsecure := flag.Bool("ldap-insecure", false, "Skip TLS certificate verification")
 	flag.Parse()
 
 	var resolver resolve.SIDResolver = resolve.WellKnownSIDResolver{}
@@ -42,11 +43,12 @@ func main() {
 
 	if *ldapServer != "" {
 		client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
-			Server:   *ldapServer,
-			BaseDN:   *ldapBaseDN,
-			BindDN:   *ldapBindDN,
-			Password: *ldapPassword,
-			UseTLS:   *ldapTLS,
+			Server:             *ldapServer,
+			BaseDN:             *ldapBaseDN,
+			BindDN:             *ldapBindDN,
+			Password:           *ldapPassword,
+			UseTLS:             *ldapTLS,
+			InsecureSkipVerify: *ldapInsecure,
 		})
 		if err != nil {
 			fmt.Printf("Warning: Failed to connect to LDAP: %v\n", err)
