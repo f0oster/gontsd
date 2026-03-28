@@ -72,7 +72,7 @@ func main() {
 						ldapGUIDResolver,
 					},
 				}
-				fmt.Printf("LDAP GUID resolver configured (cached %d extended rights)\n", ldapGUIDResolver.CacheSize())
+	
 			}
 		}
 	}
