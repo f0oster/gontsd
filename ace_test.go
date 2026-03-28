@@ -75,8 +75,9 @@ func TestParseACE_UnsupportedType(t *testing.T) {
 	if aceLen != len(data) {
 		t.Errorf("aceLen = %d, want %d", aceLen, len(data))
 	}
-	if raw.GetSID() != nil {
-		t.Error("RawACE.GetSID() should return nil")
+	// RawACE now parses common fields when possible
+	if raw.GetSID() == nil || raw.GetSID().Parsed != "S-1-5-18" {
+		t.Errorf("RawACE.GetSID() = %v, want S-1-5-18", raw.GetSID())
 	}
 }
 

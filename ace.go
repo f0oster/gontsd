@@ -297,7 +297,14 @@ func parseACE(data []byte) (ACE, int, error) {
 		}
 		raw := make([]byte, header.AceSize)
 		copy(raw, data[:header.AceSize])
-		return &RawACE{aceBase: aceBase{Header: header}, RawData: raw}, int(header.AceSize), nil
+
+		// Try to parse common fields (mask + SID) since most unsupported
+		// ACE types share the standard layout.
+		base, _, err := parseAceBase(data)
+		if err != nil {
+			base = aceBase{Header: header}
+		}
+		return &RawACE{aceBase: base, RawData: raw}, int(header.AceSize), nil
 	}
 }
 
