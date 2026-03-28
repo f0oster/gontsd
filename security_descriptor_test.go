@@ -198,3 +198,43 @@ func TestSecurityDescriptor_String_Nil(t *testing.T) {
 		t.Errorf("nil SecurityDescriptor.String() = %q, want %q", s, "<nil>")
 	}
 }
+
+func TestCollectSIDs(t *testing.T) {
+	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	sd, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	sids := sd.CollectSIDs()
+
+	// Owner + group + 4 ACE SIDs, but owner SID matches ACE[3] SID and
+	// group SID is unique, so expect 5 unique SIDs.
+	if len(sids) != 5 {
+		t.Errorf("CollectSIDs() returned %d SIDs, want 5", len(sids))
+	}
+
+	// Check deduplication — no SID string should appear twice.
+	seen := make(map[string]bool)
+	for _, sid := range sids {
+		if seen[sid.Parsed] {
+			t.Errorf("duplicate SID: %s", sid.Parsed)
+		}
+		seen[sid.Parsed] = true
+	}
+
+	// Owner and group should be included.
+	if !seen[sd.OwnerSID.Parsed] {
+		t.Error("OwnerSID not in CollectSIDs result")
+	}
+	if !seen[sd.GroupSID.Parsed] {
+		t.Error("GroupSID not in CollectSIDs result")
+	}
+}
+
+func TestCollectSIDs_Nil(t *testing.T) {
+	var sd *SecurityDescriptor
+	if sids := sd.CollectSIDs(); sids != nil {
+		t.Errorf("nil SD.CollectSIDs() = %v, want nil", sids)
+	}
+}

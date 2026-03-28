@@ -136,6 +136,53 @@ func TestCompare_NilACLs(t *testing.T) {
 	}
 }
 
+func TestCompare_NilOld(t *testing.T) {
+	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	sd, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	diff := Compare(nil, sd)
+	if !diff.HasChanges() {
+		t.Error("expected changes when old is nil")
+	}
+}
+
+func TestCompare_NilNew(t *testing.T) {
+	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	sd, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	diff := Compare(sd, nil)
+	if !diff.HasChanges() {
+		t.Error("expected changes when new is nil")
+	}
+}
+
+func TestCompare_BothNil(t *testing.T) {
+	diff := Compare(nil, nil)
+	if diff.HasChanges() {
+		t.Error("expected no changes when both nil")
+	}
+}
+
+func TestDiffType_Has(t *testing.T) {
+	dt := DiffModified | DiffReordered
+	if !dt.Has(DiffModified) {
+		t.Error("expected Has(DiffModified) = true")
+	}
+	if !dt.Has(DiffReordered) {
+		t.Error("expected Has(DiffReordered) = true")
+	}
+	if dt.Has(DiffAdded) {
+		t.Error("expected Has(DiffAdded) = false")
+	}
+	if dt.Has(DiffRemoved) {
+		t.Error("expected Has(DiffRemoved) = false")
+	}
+}
+
 func TestCompare_NilDiffResult(t *testing.T) {
 	var diff *DiffResult
 	if diff.HasChanges() {
