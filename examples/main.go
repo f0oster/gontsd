@@ -240,7 +240,7 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	fmt.Printf("%s%s:\n", indent, getACETypeName(ace))
 	fmt.Printf("%s  SID:   %s\n", indent, resolveSID(ace.GetSID(), resolver))
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
-	fmt.Printf("%s  Flags: %v\n", indent, ace.GetAccessRights())
+	fmt.Printf("%s  Rights: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
 		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUIDWithDetails(objGUID, guidResolver, indent+"            "))
 	}
@@ -341,13 +341,13 @@ func printModifiedACE(oldACE, newACE gontsd.ACE, resolver resolve.SIDResolver, g
 	}
 
 	if len(removed) > 0 {
-		fmt.Printf("%s  RemovedFlags:   %v\n", indent, removed)
+		fmt.Printf("%s  -Rights: %v\n", indent, removed)
 	}
 	if len(added) > 0 {
-		fmt.Printf("%s  AddedFlags:     %v\n", indent, added)
+		fmt.Printf("%s  +Rights: %v\n", indent, added)
 	}
 	if len(unchanged) > 0 {
-		fmt.Printf("%s  UnchangedFlags: %v\n", indent, unchanged)
+		fmt.Printf("%s   Rights: %v\n", indent, unchanged)
 	}
 }
 
