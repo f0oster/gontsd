@@ -43,10 +43,6 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 		return "", fmt.Errorf("nil SID")
 	}
 
-	if name, ok := WellKnownSIDs[sid.Parsed]; ok {
-		return name, nil
-	}
-
 	r.mu.RLock()
 	if name, ok := r.cache[sid.Parsed]; ok {
 		r.mu.RUnlock()
