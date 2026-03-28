@@ -21,20 +21,39 @@ type LDAPConfig struct {
 	InsecureSkipVerify bool // Skip TLS certificate verification
 }
 
+const defaultMaxCacheSize = 10000
+
 // LDAPSIDResolver resolves SIDs by querying Active Directory.
 type LDAPSIDResolver struct {
-	client *LDAPClient
-	cache  map[string]string // SID string -> resolved name
-	mu     sync.RWMutex
+	client       *LDAPClient
+	cache        map[string]string // SID string -> resolved name
+	mu           sync.RWMutex
+	maxCacheSize int
 }
 
 var _ SIDResolver = (*LDAPSIDResolver)(nil)
 
 // NewLDAPSIDResolver creates a new LDAP-backed SID resolver.
-func NewLDAPSIDResolver(client *LDAPClient) *LDAPSIDResolver {
-	return &LDAPSIDResolver{
-		client: client,
-		cache:  make(map[string]string),
+func NewLDAPSIDResolver(client *LDAPClient, opts ...SIDResolverOption) *LDAPSIDResolver {
+	r := &LDAPSIDResolver{
+		client:       client,
+		cache:        make(map[string]string),
+		maxCacheSize: defaultMaxCacheSize,
+	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
+}
+
+// SIDResolverOption configures an LDAPSIDResolver.
+type SIDResolverOption func(*LDAPSIDResolver)
+
+// WithMaxSIDCacheSize sets the maximum number of cached SID resolutions.
+// When exceeded, the cache is cleared. Default is 10,000.
+func WithMaxSIDCacheSize(n int) SIDResolverOption {
+	return func(r *LDAPSIDResolver) {
+		r.maxCacheSize = n
 	}
 }
 
@@ -55,9 +74,7 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 		return "", err
 	}
 
-	r.mu.Lock()
-	r.cache[sid.Parsed] = name
-	r.mu.Unlock()
+	r.cacheSID(sid.Parsed, name)
 
 	return name, nil
 }
@@ -154,9 +171,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]SIDR
 		resolvedName := extractName(entry)
 		results[sid.Parsed] = SIDResult{Name: resolvedName}
 
-		r.mu.Lock()
-		r.cache[sid.Parsed] = resolvedName
-		r.mu.Unlock()
+		r.cacheSID(sid.Parsed, resolvedName)
 	}
 
 	// Mark SIDs with no LDAP result.
@@ -183,6 +198,15 @@ func extractName(entry *ldap.Entry) string {
 		return name
 	}
 	return ""
+}
+
+func (r *LDAPSIDResolver) cacheSID(parsed, name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.maxCacheSize > 0 && len(r.cache) >= r.maxCacheSize {
+		clear(r.cache)
+	}
+	r.cache[parsed] = name
 }
 
 func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
