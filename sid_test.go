@@ -91,10 +91,10 @@ func TestParseSID_Errors(t *testing.T) {
 }
 
 func TestSID_String(t *testing.T) {
-	sid := &SID{Parsed: "S-1-5-18", ResolvedName: "Local System"}
+	sid := &SID{Parsed: "S-1-5-18"}
 	s := sid.String()
-	if s != "SID: S-1-5-18 (Local System)" {
-		t.Errorf("SID.String() = %q, want %q", s, "SID: S-1-5-18 (Local System)")
+	if s != "S-1-5-18" {
+		t.Errorf("SID.String() = %q, want %q", s, "S-1-5-18")
 	}
 
 	var nilSID *SID

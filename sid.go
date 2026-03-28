@@ -8,16 +8,15 @@ import (
 // SID represents a Windows Security Identifier.
 // See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/78eb9013-1c3a-4970-ad1f-2b1dad588a25
 type SID struct {
-	Raw          []byte
-	Parsed       string
-	ResolvedName string
+	Raw    []byte
+	Parsed string
 }
 
 func (s *SID) String() string {
 	if s == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("SID: %s (%s)", s.Parsed, s.ResolvedName)
+	return s.Parsed
 }
 
 func parseSID(data []byte) (*SID, int, error) {
