@@ -71,12 +71,18 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		sd.DACL = dacl
 	}
 
-	if sd.OwnerOffset > 0 {
-		ownerSID, _, _ := parseSID(descriptor[sd.OwnerOffset:])
+	if sd.OwnerOffset > 0 && int(sd.OwnerOffset) < len(descriptor) {
+		ownerSID, _, err := parseSID(descriptor[sd.OwnerOffset:])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse owner SID: %w", err)
+		}
 		sd.OwnerSID = ownerSID
 	}
-	if sd.GroupOffset > 0 {
-		groupSID, _, _ := parseSID(descriptor[sd.GroupOffset:])
+	if sd.GroupOffset > 0 && int(sd.GroupOffset) < len(descriptor) {
+		groupSID, _, err := parseSID(descriptor[sd.GroupOffset:])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse group SID: %w", err)
+		}
 		sd.GroupSID = groupSID
 	}
 
