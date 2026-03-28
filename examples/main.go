@@ -134,6 +134,9 @@ func runTestCaseComparisons(resolver resolve.SIDResolver, guidResolver resolve.S
 			continue
 		}
 
+		// Batch-resolve all SIDs from both descriptors upfront.
+		resolve.ResolveBatchSIDs(resolver, append(defaultSD.CollectSIDs(), changeSD.CollectSIDs()...))
+
 		diff := gontsd.Compare(defaultSD, changeSD)
 		printDiff(diff, resolver, guidResolver)
 	}
@@ -154,6 +157,9 @@ func dumpSecurityDescriptor(path string, resolver resolve.SIDResolver, guidResol
 		fmt.Printf("Failed to parse SD: %v\n", err)
 		return
 	}
+
+	// Batch-resolve all SIDs upfront so individual lookups are cache hits.
+	resolve.ResolveBatchSIDs(resolver, sd.CollectSIDs())
 
 	fmt.Printf("\nOwner: %s\n", resolveSID(sd.OwnerSID, resolver))
 	fmt.Printf("Group: %s\n", resolveSID(sd.GroupSID, resolver))

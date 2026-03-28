@@ -239,3 +239,42 @@ func (c ChainSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	}
 	return "", fmt.Errorf("no resolver could resolve SID: %s", sid.Parsed)
 }
+
+// BatchSIDResolver is an optional interface for resolvers that support
+// resolving multiple SIDs in fewer round-trips than individual calls.
+type BatchSIDResolver interface {
+	ResolveBatch(sids []*gontsd.SID) map[string]SIDResult
+}
+
+// ResolveBatchSIDs resolves multiple SIDs using the given resolver.
+// If the resolver (or any resolver in a chain) supports batching,
+// it will be used. Otherwise falls back to individual Resolve calls.
+func ResolveBatchSIDs(resolver SIDResolver, sids []*gontsd.SID) map[string]SIDResult {
+	if br, ok := findBatchResolver(resolver); ok {
+		return br.ResolveBatch(sids)
+	}
+
+	results := make(map[string]SIDResult, len(sids))
+	for _, sid := range sids {
+		if sid == nil {
+			continue
+		}
+		name, err := resolver.Resolve(sid)
+		results[sid.Parsed] = SIDResult{Name: name, Err: err}
+	}
+	return results
+}
+
+func findBatchResolver(r SIDResolver) (BatchSIDResolver, bool) {
+	if br, ok := r.(BatchSIDResolver); ok {
+		return br, true
+	}
+	if chain, ok := r.(ChainSIDResolver); ok {
+		for _, inner := range chain.Resolvers {
+			if br, found := findBatchResolver(inner); found {
+				return br, true
+			}
+		}
+	}
+	return nil, false
+}

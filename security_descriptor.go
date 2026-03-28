@@ -110,6 +110,38 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 	return sd, nil
 }
 
+// CollectSIDs returns all unique SIDs referenced by this security descriptor,
+// including owner, group, and all ACE SIDs from the DACL and SACL.
+func (sd *SecurityDescriptor) CollectSIDs() []*SID {
+	if sd == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var sids []*SID
+
+	add := func(sid *SID) {
+		if sid != nil && !seen[sid.Parsed] {
+			seen[sid.Parsed] = true
+			sids = append(sids, sid)
+		}
+	}
+
+	add(sd.OwnerSID)
+	add(sd.GroupSID)
+
+	for _, acl := range []*ACL{sd.DACL, sd.SACL} {
+		if acl == nil {
+			continue
+		}
+		for _, ace := range acl.ACEs {
+			add(ace.GetSID())
+		}
+	}
+
+	return sids
+}
+
 func (sd *SecurityDescriptor) String() string {
 	if sd == nil {
 		return "<nil>"
