@@ -3,6 +3,8 @@ package resolve
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/f0oster/gontsd"
@@ -124,66 +126,51 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 
 // sidToBinaryString converts a raw SID to LDAP binary escape format (\XX per byte)
 func sidToBinaryString(raw []byte) string {
-	result := ""
+	var sb strings.Builder
 	for _, b := range raw {
-		result += fmt.Sprintf("\\%02x", b)
+		fmt.Fprintf(&sb, "\\%02x", b)
 	}
-	return result
+	return sb.String()
 }
 
 // SIDFromString parses a SID string (e.g., "S-1-5-21-...") into binary format.
 func SIDFromString(sidStr string) ([]byte, error) {
-	var revision uint8
-	var identifierAuthority uint64
-	var subAuthorities []uint32
-
-	var subAuthStr string
-	n, err := fmt.Sscanf(sidStr, "S-%d-%d-%s", &revision, &identifierAuthority, &subAuthStr)
-	if err != nil && n < 2 {
+	if !strings.HasPrefix(sidStr, "S-") {
 		return nil, fmt.Errorf("invalid SID format: %s", sidStr)
 	}
 
-	if n >= 3 && subAuthStr != "" {
-		remaining := sidStr
-		for i := 0; i < 3; i++ {
-			for j := 0; j < len(remaining); j++ {
-				if remaining[j] == '-' {
-					remaining = remaining[j+1:]
-					break
-				}
-			}
-		}
-
-		for remaining != "" {
-			var subAuth uint32
-			var consumed int
-			for consumed = 0; consumed < len(remaining); consumed++ {
-				if remaining[consumed] == '-' {
-					break
-				}
-			}
-			_, err := fmt.Sscanf(remaining[:consumed], "%d", &subAuth)
-			if err != nil {
-				break
-			}
-			subAuthorities = append(subAuthorities, subAuth)
-			if consumed >= len(remaining) || remaining[consumed] != '-' {
-				break
-			}
-			remaining = remaining[consumed+1:]
-		}
+	parts := strings.Split(sidStr[2:], "-")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid SID format: %s", sidStr)
 	}
 
-	// Build binary SID
-	// SID structure: Revision (1) + SubAuthorityCount (1) + IdentifierAuthority (6) + SubAuthorities (4 * count)
-	sidLen := 8 + len(subAuthorities)*4
-	raw := make([]byte, sidLen)
+	revision, err := strconv.ParseUint(parts[0], 10, 8)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SID revision: %w", err)
+	}
 
-	raw[0] = revision
+	identifierAuthority, err := strconv.ParseUint(parts[1], 10, 48)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SID identifier authority: %w", err)
+	}
+
+	var subAuthorities []uint32
+	for _, part := range parts[2:] {
+		sa, err := strconv.ParseUint(part, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SID sub-authority %q: %w", part, err)
+		}
+		subAuthorities = append(subAuthorities, uint32(sa))
+	}
+
+	// SID structure: Revision (1) + SubAuthorityCount (1) + IdentifierAuthority (6) + SubAuthorities (4 * count)
+	raw := make([]byte, 8+len(subAuthorities)*4)
+
+	raw[0] = uint8(revision)
 	raw[1] = uint8(len(subAuthorities))
 
 	// Identifier authority is 6 bytes big-endian
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		raw[7-i] = uint8(identifierAuthority >> (8 * i))
 	}
 
