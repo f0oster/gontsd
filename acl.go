@@ -8,10 +8,10 @@ import (
 // ACL represents an Access Control List containing ACE entries.
 type ACL struct {
 	Revision uint8
-	Sbz1     uint8
+	sbz1     uint8
 	Size     uint16
 	Count    uint16
-	Sbz2     uint16
+	sbz2     uint16
 	ACEs     []ACE
 }
 
