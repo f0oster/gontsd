@@ -64,195 +64,186 @@ type ACE interface {
 	String() string
 	GetSID() *SID
 	GetMask() uint32
-	GetFlags() []string
+	GetAceFlags() uint8
+	GetAccessRights() []string
 	GetObjectTypeGUID() string
 	GetInheritedObjectTypeGUID() string
 }
 
-type baseACE struct {
-	Header ACEHeader
-	Mask   uint32
-	SID    *SID
-	Flags  []string
+// aceBase contains the fields common to every ACE type.
+type aceBase struct {
+	Header       ACEHeader
+	Mask         uint32
+	SID          *SID
+	AccessRights []string
 }
 
-func (b *baseACE) Type() ACEType                      { return b.Header.AceType }
-func (b *baseACE) Size() uint16                       { return b.Header.AceSize }
-func (b *baseACE) GetSID() *SID                       { return b.SID }
-func (b *baseACE) GetMask() uint32                    { return b.Mask }
-func (b *baseACE) GetFlags() []string                 { return b.Flags }
-func (b *baseACE) GetObjectTypeGUID() string          { return "" }
-func (b *baseACE) GetInheritedObjectTypeGUID() string { return "" }
-
-type baseObjectACE struct {
-	Header              ACEHeader
-	Mask                uint32
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
-	SID                 *SID
-	FlagStrings         []string
-}
-
-func (b *baseObjectACE) Type() ACEType       { return b.Header.AceType }
-func (b *baseObjectACE) Size() uint16       { return b.Header.AceSize }
-func (b *baseObjectACE) GetSID() *SID       { return b.SID }
-func (b *baseObjectACE) GetMask() uint32    { return b.Mask }
-func (b *baseObjectACE) GetFlags() []string { return b.FlagStrings }
-
-func (b *baseObjectACE) GetObjectTypeGUID() string {
-	if b.ObjectFlags&0x1 == 0 {
-		return ""
-	}
-	guid, err := GUIDBytesToString(b.ObjectType[:])
-	if err != nil {
-		return ""
-	}
-	return guid
-}
-
-func (b *baseObjectACE) GetInheritedObjectTypeGUID() string {
-	if b.ObjectFlags&0x2 == 0 {
-		return ""
-	}
-	guid, err := GUIDBytesToString(b.InheritedObjectType[:])
-	if err != nil {
-		return ""
-	}
-	return guid
-}
+func (b *aceBase) Type() ACEType              { return b.Header.AceType }
+func (b *aceBase) Size() uint16               { return b.Header.AceSize }
+func (b *aceBase) GetSID() *SID               { return b.SID }
+func (b *aceBase) GetMask() uint32            { return b.Mask }
+func (b *aceBase) GetAceFlags() uint8         { return b.Header.AceFlags }
+func (b *aceBase) GetAccessRights() []string  { return b.AccessRights }
+func (b *aceBase) GetObjectTypeGUID() string          { return "" }
+func (b *aceBase) GetInheritedObjectTypeGUID() string { return "" }
 
 // AccessAllowedACE grants access rights to a trustee.
 type AccessAllowedACE struct {
-	baseACE
+	aceBase
 }
 
 func (a *AccessAllowedACE) String() string {
-	return fmt.Sprintf(`AccessAllowedACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-}`, a.Mask, a.SID, a.Flags)
+	return fmt.Sprintf("AccessAllowedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
 }
 
 // AccessDeniedACE denies access rights to a trustee.
 type AccessDeniedACE struct {
-	baseACE
+	aceBase
 }
 
 func (a *AccessDeniedACE) String() string {
-	return fmt.Sprintf(`AccessDeniedACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-}`, a.Mask, a.SID, a.Flags)
+	return fmt.Sprintf("AccessDeniedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
 }
 
 // AccessAllowedObjectACE grants access rights to a trustee for a specific object type or property.
 type AccessAllowedObjectACE struct {
-	baseObjectACE
+	aceBase
+	ObjectFlags         uint32
+	ObjectType          [16]byte
+	InheritedObjectType [16]byte
+}
+
+func (a *AccessAllowedObjectACE) GetObjectTypeGUID() string {
+	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
+}
+
+func (a *AccessAllowedObjectACE) GetInheritedObjectTypeGUID() string {
+	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessAllowedObjectACE) String() string {
-	return fmt.Sprintf(`AccessAllowedObjectACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags %s
-}`, a.Mask, a.SID, a.FlagStrings)
+	return fmt.Sprintf("AccessAllowedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
 }
 
 // AccessDeniedObjectACE denies access rights to a trustee for a specific object type or property.
 type AccessDeniedObjectACE struct {
-	baseObjectACE
+	aceBase
+	ObjectFlags         uint32
+	ObjectType          [16]byte
+	InheritedObjectType [16]byte
+}
+
+func (a *AccessDeniedObjectACE) GetObjectTypeGUID() string {
+	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
+}
+
+func (a *AccessDeniedObjectACE) GetInheritedObjectTypeGUID() string {
+	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessDeniedObjectACE) String() string {
-	return fmt.Sprintf(`AccessDeniedObjectACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags %s
-}`, a.Mask, a.SID, a.FlagStrings)
+	return fmt.Sprintf("AccessDeniedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
 }
 
-// Callback ACE types store conditional expressions as raw bytes in ApplicationData.
+// AccessAllowedCallbackACE grants access rights with a conditional expression.
 // See MS-DTYP 2.4.4.17 for the conditional expression format.
 type AccessAllowedCallbackACE struct {
-	baseACE
+	aceBase
 	ApplicationData []byte
 }
 
 func (a *AccessAllowedCallbackACE) String() string {
-	return fmt.Sprintf(`AccessAllowedCallbackACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-  Condition: %d bytes
-}`, a.Mask, a.SID, a.Flags, len(a.ApplicationData))
+	return fmt.Sprintf("AccessAllowedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
 
 // AccessDeniedCallbackACE denies access rights with a conditional expression.
 type AccessDeniedCallbackACE struct {
-	baseACE
+	aceBase
 	ApplicationData []byte
 }
 
 func (a *AccessDeniedCallbackACE) String() string {
-	return fmt.Sprintf(`AccessDeniedCallbackACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-  Condition: %d bytes
-}`, a.Mask, a.SID, a.Flags, len(a.ApplicationData))
+	return fmt.Sprintf("AccessDeniedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
 
 // AccessAllowedCallbackObjectACE grants access rights to a specific object type with a conditional expression.
 type AccessAllowedCallbackObjectACE struct {
-	baseObjectACE
-	ApplicationData []byte
+	aceBase
+	ObjectFlags         uint32
+	ObjectType          [16]byte
+	InheritedObjectType [16]byte
+	ApplicationData     []byte
+}
+
+func (a *AccessAllowedCallbackObjectACE) GetObjectTypeGUID() string {
+	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
+}
+
+func (a *AccessAllowedCallbackObjectACE) GetInheritedObjectTypeGUID() string {
+	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessAllowedCallbackObjectACE) String() string {
-	return fmt.Sprintf(`AccessAllowedCallbackObjectACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-  Condition: %d bytes
-}`, a.Mask, a.SID, a.FlagStrings, len(a.ApplicationData))
+	return fmt.Sprintf("AccessAllowedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
 
 // AccessDeniedCallbackObjectACE denies access rights to a specific object type with a conditional expression.
 type AccessDeniedCallbackObjectACE struct {
-	baseObjectACE
-	ApplicationData []byte
+	aceBase
+	ObjectFlags         uint32
+	ObjectType          [16]byte
+	InheritedObjectType [16]byte
+	ApplicationData     []byte
+}
+
+func (a *AccessDeniedCallbackObjectACE) GetObjectTypeGUID() string {
+	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
+}
+
+func (a *AccessDeniedCallbackObjectACE) GetInheritedObjectTypeGUID() string {
+	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessDeniedCallbackObjectACE) String() string {
-	return fmt.Sprintf(`AccessDeniedCallbackObjectACE {
-  Mask: 0x%08X
-  SID:  %s
-  Flags: %v
-  Condition: %d bytes
-}`, a.Mask, a.SID, a.FlagStrings, len(a.ApplicationData))
+	return fmt.Sprintf("AccessDeniedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
 
 // RawACE represents an ACE type that is not explicitly supported.
 // The raw bytes are preserved so the ACE can still be compared and displayed.
 type RawACE struct {
-	Header  ACEHeader
+	aceBase
 	RawData []byte
 }
-
-func (a *RawACE) Type() ACEType                      { return a.Header.AceType }
-func (a *RawACE) Size() uint16                       { return a.Header.AceSize }
-func (a *RawACE) GetSID() *SID                       { return nil }
-func (a *RawACE) GetMask() uint32                    { return 0 }
-func (a *RawACE) GetFlags() []string                 { return nil }
-func (a *RawACE) GetObjectTypeGUID() string          { return "" }
-func (a *RawACE) GetInheritedObjectTypeGUID() string { return "" }
 
 func (a *RawACE) String() string {
 	return fmt.Sprintf("RawACE { Type: 0x%02X, Size: %d }", a.Header.AceType, a.Header.AceSize)
 }
+
+// GUID helpers for object ACE types.
+
+func objectTypeGUID(flags uint32, objType [16]byte) string {
+	if flags&0x1 == 0 {
+		return ""
+	}
+	guid, err := GUIDBytesToString(objType[:])
+	if err != nil {
+		return ""
+	}
+	return guid
+}
+
+func inheritedObjectTypeGUID(flags uint32, inhType [16]byte) string {
+	if flags&0x2 == 0 {
+		return ""
+	}
+	guid, err := GUIDBytesToString(inhType[:])
+	if err != nil {
+		return ""
+	}
+	return guid
+}
+
+// Parsing functions.
 
 func parseACE(data []byte) (ACE, int, error) {
 	if len(data) < 8 {
@@ -261,56 +252,42 @@ func parseACE(data []byte) (ACE, int, error) {
 
 	switch ACEType(data[0]) {
 	case AccessAllowedACEType:
-		a, err := parseAccessAllowedACE(data)
+		a, err := parseSimpleACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
-		return a, int(a.Size()), nil
+		return &AccessAllowedACE{aceBase: a}, int(a.Header.AceSize), nil
 	case AccessDeniedACEType:
-		a, err := parseAccessDeniedACE(data)
+		a, err := parseSimpleACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
-		return a, int(a.Size()), nil
+		return &AccessDeniedACE{aceBase: a}, int(a.Header.AceSize), nil
 	case AccessAllowedObjectACEType:
-		a, err := parseAccessAllowedObjectACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
+			return &AccessAllowedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		})
 	case AccessDeniedObjectACEType:
-		a, err := parseAccessDeniedObjectACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
+			return &AccessDeniedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		})
 	case AccessAllowedCallbackACEType:
-		a, err := parseAccessAllowedCallbackACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
+			return &AccessAllowedCallbackACE{aceBase: base, ApplicationData: appData}
+		})
 	case AccessDeniedCallbackACEType:
-		a, err := parseAccessDeniedCallbackACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
+			return &AccessDeniedCallbackACE{aceBase: base, ApplicationData: appData}
+		})
 	case AccessAllowedCallbackObjType:
-		a, err := parseAccessAllowedCallbackObjectACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
+			return &AccessAllowedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
+		})
 	case AccessDeniedCallbackObjType:
-		a, err := parseAccessDeniedCallbackObjectACE(data)
-		if err != nil {
-			return nil, 0, err
-		}
-		return a, int(a.Size()), nil
+		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
+			return &AccessDeniedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
+		})
 	default:
-		// For unsupported ACE types (e.g. SYSTEM_AUDIT), preserve raw bytes
-		// so parsing can continue past them.
 		header, err := parseACEHeader(data)
 		if err != nil {
 			return nil, 0, err
@@ -320,7 +297,7 @@ func parseACE(data []byte) (ACE, int, error) {
 		}
 		raw := make([]byte, header.AceSize)
 		copy(raw, data[:header.AceSize])
-		return &RawACE{Header: header, RawData: raw}, int(header.AceSize), nil
+		return &RawACE{aceBase: aceBase{Header: header}, RawData: raw}, int(header.AceSize), nil
 	}
 }
 
@@ -335,210 +312,154 @@ func parseACEHeader(data []byte) (ACEHeader, error) {
 	}, nil
 }
 
-func parseBaseACE(data []byte) (baseACE, error) {
+// parseAceBase parses the common header + mask + SID, returning the base and
+// the number of bytes consumed for the SID (needed by callback ACE types).
+func parseAceBase(data []byte) (aceBase, int, error) {
 	header, err := parseACEHeader(data)
 	if err != nil {
-		return baseACE{}, err
+		return aceBase{}, 0, err
 	}
 	if len(data) < 8 {
-		return baseACE{}, fmt.Errorf("data too short for ACE mask")
-	}
-	mask := binary.LittleEndian.Uint32(data[4:8])
-	sid, _, err := parseSID(data[8:])
-	if err != nil {
-		return baseACE{}, err
-	}
-	return baseACE{
-		Header: header,
-		Mask:   mask,
-		SID:    sid,
-		Flags:  CheckFlags(mask),
-	}, nil
-}
-
-func parseBaseACEWithSIDLen(data []byte) (baseACE, int, error) {
-	header, err := parseACEHeader(data)
-	if err != nil {
-		return baseACE{}, 0, err
-	}
-	if len(data) < 8 {
-		return baseACE{}, 0, fmt.Errorf("data too short for ACE mask")
+		return aceBase{}, 0, fmt.Errorf("data too short for ACE mask")
 	}
 	mask := binary.LittleEndian.Uint32(data[4:8])
 	sid, sidLen, err := parseSID(data[8:])
 	if err != nil {
-		return baseACE{}, 0, err
+		return aceBase{}, 0, err
 	}
-	return baseACE{
-		Header: header,
-		Mask:   mask,
-		SID:    sid,
-		Flags:  CheckFlags(mask),
+	return aceBase{
+		Header:       header,
+		Mask:         mask,
+		SID:          sid,
+		AccessRights: CheckFlags(mask),
 	}, sidLen, nil
 }
 
-func parseBaseObjectACE(data []byte) (baseObjectACE, int, error) {
+func parseSimpleACE(data []byte) (aceBase, error) {
+	base, _, err := parseAceBase(data)
+	return base, err
+}
+
+func parseObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte) ACE) (ACE, int, error) {
 	header, err := parseACEHeader(data)
 	if err != nil {
-		return baseObjectACE{}, 0, err
+		return nil, 0, err
 	}
 	if len(data) < int(header.AceSize) {
-		return baseObjectACE{}, 0, fmt.Errorf("ACE claims size %d, but only %d bytes available", header.AceSize, len(data))
+		return nil, 0, fmt.Errorf("ACE claims size %d, but only %d bytes available", header.AceSize, len(data))
 	}
 
 	mask := binary.LittleEndian.Uint32(data[4:8])
-	flags := binary.LittleEndian.Uint32(data[8:12])
+	objFlags := binary.LittleEndian.Uint32(data[8:12])
 
 	offset := 12
 	var objType, inhType [16]byte
 
-	if flags&0x1 != 0 {
+	if objFlags&0x1 != 0 {
 		if offset+16 > len(data) {
-			return baseObjectACE{}, 0, fmt.Errorf("not enough data for ObjectType")
+			return nil, 0, fmt.Errorf("not enough data for ObjectType")
 		}
 		copy(objType[:], data[offset:offset+16])
 		offset += 16
 	}
-	if flags&0x2 != 0 {
+	if objFlags&0x2 != 0 {
 		if offset+16 > len(data) {
-			return baseObjectACE{}, 0, fmt.Errorf("not enough data for InheritedObjectType")
+			return nil, 0, fmt.Errorf("not enough data for InheritedObjectType")
 		}
 		copy(inhType[:], data[offset:offset+16])
 		offset += 16
 	}
 
 	if offset >= len(data) {
-		return baseObjectACE{}, 0, fmt.Errorf("not enough data to read SID (offset %d, len %d)", offset, len(data))
+		return nil, 0, fmt.Errorf("not enough data to read SID (offset %d, len %d)", offset, len(data))
+	}
+
+	sid, _, err := parseSID(data[offset:])
+	if err != nil {
+		return nil, 0, err
+	}
+
+	base := aceBase{
+		Header:       header,
+		Mask:         mask,
+		SID:          sid,
+		AccessRights: CheckFlags(mask),
+	}
+
+	return build(base, objFlags, objType, inhType), int(header.AceSize), nil
+}
+
+func parseCallbackACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, error) {
+	base, sidLen, err := parseAceBase(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(data) < int(base.Header.AceSize) {
+		return nil, 0, fmt.Errorf("ACE claims size %d, but only %d bytes available", base.Header.AceSize, len(data))
+	}
+
+	appDataStart := 8 + sidLen
+	var appData []byte
+	if appDataStart < int(base.Header.AceSize) {
+		appData = make([]byte, int(base.Header.AceSize)-appDataStart)
+		copy(appData, data[appDataStart:base.Header.AceSize])
+	}
+
+	return build(base, appData), int(base.Header.AceSize), nil
+}
+
+func parseCallbackObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte, []byte) ACE) (ACE, int, error) {
+	header, err := parseACEHeader(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(data) < int(header.AceSize) {
+		return nil, 0, fmt.Errorf("ACE claims size %d, but only %d bytes available", header.AceSize, len(data))
+	}
+
+	mask := binary.LittleEndian.Uint32(data[4:8])
+	objFlags := binary.LittleEndian.Uint32(data[8:12])
+
+	offset := 12
+	var objType, inhType [16]byte
+
+	if objFlags&0x1 != 0 {
+		if offset+16 > len(data) {
+			return nil, 0, fmt.Errorf("not enough data for ObjectType")
+		}
+		copy(objType[:], data[offset:offset+16])
+		offset += 16
+	}
+	if objFlags&0x2 != 0 {
+		if offset+16 > len(data) {
+			return nil, 0, fmt.Errorf("not enough data for InheritedObjectType")
+		}
+		copy(inhType[:], data[offset:offset+16])
+		offset += 16
+	}
+
+	if offset >= len(data) {
+		return nil, 0, fmt.Errorf("not enough data to read SID (offset %d, len %d)", offset, len(data))
 	}
 
 	sid, sidLen, err := parseSID(data[offset:])
 	if err != nil {
-		return baseObjectACE{}, 0, err
+		return nil, 0, err
 	}
 
-	return baseObjectACE{
-		Header:              header,
-		Mask:                mask,
-		ObjectFlags:         flags,
-		ObjectType:          objType,
-		InheritedObjectType: inhType,
-		SID:                 sid,
-		FlagStrings:         CheckFlags(mask),
-	}, offset + sidLen, nil
-}
-
-func parseAccessAllowedACE(data []byte) (*AccessAllowedACE, error) {
-	base, err := parseBaseACE(data)
-	if err != nil {
-		return nil, err
-	}
-	return &AccessAllowedACE{baseACE: base}, nil
-}
-
-func parseAccessDeniedACE(data []byte) (*AccessDeniedACE, error) {
-	base, err := parseBaseACE(data)
-	if err != nil {
-		return nil, err
-	}
-	return &AccessDeniedACE{baseACE: base}, nil
-}
-
-func parseAccessAllowedObjectACE(data []byte) (*AccessAllowedObjectACE, error) {
-	base, _, err := parseBaseObjectACE(data)
-	if err != nil {
-		return nil, err
-	}
-	return &AccessAllowedObjectACE{baseObjectACE: base}, nil
-}
-
-func parseAccessDeniedObjectACE(data []byte) (*AccessDeniedObjectACE, error) {
-	base, _, err := parseBaseObjectACE(data)
-	if err != nil {
-		return nil, err
-	}
-	return &AccessDeniedObjectACE{baseObjectACE: base}, nil
-}
-
-func parseAccessAllowedCallbackACE(data []byte) (*AccessAllowedCallbackACE, error) {
-	base, sidLen, err := parseBaseACEWithSIDLen(data)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) < int(base.Header.AceSize) {
-		return nil, fmt.Errorf("ACE claims size %d, but only %d bytes available", base.Header.AceSize, len(data))
+	base := aceBase{
+		Header:       header,
+		Mask:         mask,
+		SID:          sid,
+		AccessRights: CheckFlags(mask),
 	}
 
-	// ApplicationData follows the SID
-	appDataStart := 8 + sidLen
+	appDataStart := offset + sidLen
 	var appData []byte
-	if appDataStart < int(base.Header.AceSize) {
-		appData = make([]byte, int(base.Header.AceSize)-appDataStart)
-		copy(appData, data[appDataStart:base.Header.AceSize])
+	if appDataStart < int(header.AceSize) {
+		appData = make([]byte, int(header.AceSize)-appDataStart)
+		copy(appData, data[appDataStart:header.AceSize])
 	}
 
-	return &AccessAllowedCallbackACE{
-		baseACE:         base,
-		ApplicationData: appData,
-	}, nil
-}
-
-func parseAccessDeniedCallbackACE(data []byte) (*AccessDeniedCallbackACE, error) {
-	base, sidLen, err := parseBaseACEWithSIDLen(data)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) < int(base.Header.AceSize) {
-		return nil, fmt.Errorf("ACE claims size %d, but only %d bytes available", base.Header.AceSize, len(data))
-	}
-
-	// ApplicationData follows the SID
-	appDataStart := 8 + sidLen
-	var appData []byte
-	if appDataStart < int(base.Header.AceSize) {
-		appData = make([]byte, int(base.Header.AceSize)-appDataStart)
-		copy(appData, data[appDataStart:base.Header.AceSize])
-	}
-
-	return &AccessDeniedCallbackACE{
-		baseACE:         base,
-		ApplicationData: appData,
-	}, nil
-}
-
-func parseAccessAllowedCallbackObjectACE(data []byte) (*AccessAllowedCallbackObjectACE, error) {
-	base, sidEndOffset, err := parseBaseObjectACE(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// ApplicationData follows the SID
-	var appData []byte
-	if sidEndOffset < int(base.Header.AceSize) {
-		appData = make([]byte, int(base.Header.AceSize)-sidEndOffset)
-		copy(appData, data[sidEndOffset:base.Header.AceSize])
-	}
-
-	return &AccessAllowedCallbackObjectACE{
-		baseObjectACE:   base,
-		ApplicationData: appData,
-	}, nil
-}
-
-func parseAccessDeniedCallbackObjectACE(data []byte) (*AccessDeniedCallbackObjectACE, error) {
-	base, sidEndOffset, err := parseBaseObjectACE(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// ApplicationData follows the SID
-	var appData []byte
-	if sidEndOffset < int(base.Header.AceSize) {
-		appData = make([]byte, int(base.Header.AceSize)-sidEndOffset)
-		copy(appData, data[sidEndOffset:base.Header.AceSize])
-	}
-
-	return &AccessDeniedCallbackObjectACE{
-		baseObjectACE:   base,
-		ApplicationData: appData,
-	}, nil
+	return build(base, objFlags, objType, inhType, appData), int(header.AceSize), nil
 }

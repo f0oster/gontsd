@@ -75,6 +75,16 @@ func (d *DiffResult) HasChanges() bool {
 
 // Compare compares two SecurityDescriptors and returns the differences.
 func Compare(old, new *SecurityDescriptor) *DiffResult {
+	if old == nil && new == nil {
+		return &DiffResult{}
+	}
+	if old == nil {
+		old = &SecurityDescriptor{}
+	}
+	if new == nil {
+		new = &SecurityDescriptor{}
+	}
+
 	result := &DiffResult{}
 
 	if !sidEqual(old.OwnerSID, new.OwnerSID) {
@@ -270,10 +280,14 @@ type indexedACE struct {
 
 func aceIdentity(ace ACE) string {
 	sid := ace.GetSID()
-	if sid == nil {
-		return fmt.Sprintf("0x%02X:<nil>", ace.Type())
+	sidStr := "<nil>"
+	if sid != nil {
+		sidStr = sid.Parsed
 	}
-	return fmt.Sprintf("0x%02X:%s", ace.Type(), sid.Parsed)
+	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
+		return fmt.Sprintf("0x%02X:%s:%s", ace.Type(), sidStr, objGUID)
+	}
+	return fmt.Sprintf("0x%02X:%s", ace.Type(), sidStr)
 }
 
 func aceEqual(a, b ACE) bool {
@@ -286,13 +300,13 @@ func aceEqual(a, b ACE) bool {
 	if a.Type() != b.Type() {
 		return false
 	}
+	if a.GetAceFlags() != b.GetAceFlags() {
+		return false
+	}
 	if a.GetMask() != b.GetMask() {
 		return false
 	}
 	if !sidEqual(a.GetSID(), b.GetSID()) {
-		return false
-	}
-	if aceFlags(a) != aceFlags(b) {
 		return false
 	}
 	if a.GetObjectTypeGUID() != b.GetObjectTypeGUID() {
@@ -305,30 +319,6 @@ func aceEqual(a, b ACE) bool {
 		return false
 	}
 	return true
-}
-
-func aceFlags(a ACE) uint8 {
-	switch v := a.(type) {
-	case *AccessAllowedACE:
-		return v.Header.AceFlags
-	case *AccessDeniedACE:
-		return v.Header.AceFlags
-	case *AccessAllowedObjectACE:
-		return v.Header.AceFlags
-	case *AccessDeniedObjectACE:
-		return v.Header.AceFlags
-	case *AccessAllowedCallbackACE:
-		return v.Header.AceFlags
-	case *AccessDeniedCallbackACE:
-		return v.Header.AceFlags
-	case *AccessAllowedCallbackObjectACE:
-		return v.Header.AceFlags
-	case *AccessDeniedCallbackObjectACE:
-		return v.Header.AceFlags
-	case *RawACE:
-		return v.Header.AceFlags
-	}
-	return 0
 }
 
 func aceAppData(a ACE) []byte {

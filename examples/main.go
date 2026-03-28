@@ -236,7 +236,7 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	fmt.Printf("%s%s:\n", indent, getACETypeName(ace))
 	fmt.Printf("%s  SID:   %s\n", indent, resolveSID(ace.GetSID(), resolver))
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
-	fmt.Printf("%s  Flags: %v\n", indent, ace.GetFlags())
+	fmt.Printf("%s  Flags: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
 		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUIDWithDetails(objGUID, guidResolver, indent+"            "))
 	}
@@ -322,7 +322,7 @@ func printModifiedACE(oldACE, newACE gontsd.ACE, resolver resolve.SIDResolver, g
 		return
 	}
 
-	added, removed, unchanged := compareFlagSlices(oldACE.GetFlags(), newACE.GetFlags())
+	added, removed, unchanged := compareFlagSlices(oldACE.GetAccessRights(), newACE.GetAccessRights())
 
 	fmt.Printf("%s%s:\n", indent, getACETypeName(newACE))
 	fmt.Printf("%s  SID:  %s\n", indent, resolveSID(newACE.GetSID(), resolver))
