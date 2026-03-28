@@ -212,16 +212,16 @@ func printACLDiff(aclDiff *gontsd.ACLDiff, resolver resolve.SIDResolver, guidRes
 	for _, aceDiff := range aclDiff.ACEDiffs {
 		switch aceDiff.Type {
 		case gontsd.DiffAdded:
-			fmt.Printf("  [+] Added at position %d:\n", aceDiff.Position)
+			fmt.Printf("  [+] Added at position %d:\n", aceDiff.NewPosition)
 			printACE(aceDiff.NewACE, resolver, guidResolver, "      ")
 		case gontsd.DiffRemoved:
-			fmt.Printf("  [-] Removed from position %d:\n", aceDiff.Position)
+			fmt.Printf("  [-] Removed from position %d:\n", aceDiff.OldPosition)
 			printACE(aceDiff.OldACE, resolver, guidResolver, "      ")
 		case gontsd.DiffModified:
-			fmt.Printf("  [~] Modified at position %d:\n", aceDiff.Position)
+			fmt.Printf("  [~] Modified at position %d:\n", aceDiff.NewPosition)
 			printModifiedACE(aceDiff.OldACE, aceDiff.NewACE, resolver, guidResolver, "      ")
 		case gontsd.DiffReordered:
-			fmt.Printf("  [↔] Reordered to position %d:\n", aceDiff.Position)
+			fmt.Printf("  [↔] Moved from position %d to %d:\n", aceDiff.OldPosition, aceDiff.NewPosition)
 			printACE(aceDiff.NewACE, resolver, guidResolver, "      ")
 		}
 	}

@@ -32,10 +32,11 @@ func (d DiffType) String() string {
 
 // ACEDiff represents a single change to an ACE.
 type ACEDiff struct {
-	Type     DiffType
-	Position int // Index in the ACL
-	OldACE   ACE // nil if Added
-	NewACE   ACE // nil if Removed
+	Type        DiffType
+	OldPosition int // Index in the old ACL, or -1 if Added
+	NewPosition int // Index in the new ACL, or -1 if Removed
+	OldACE      ACE // nil if Added
+	NewACE      ACE // nil if Removed
 }
 
 // ACLDiff represents the changes between two ACLs.
@@ -134,9 +135,10 @@ func compareACL(old, new *ACL) *ACLDiff {
 		}
 		for i, ace := range new.ACEs {
 			diff.ACEDiffs = append(diff.ACEDiffs, ACEDiff{
-				Type:     DiffAdded,
-				Position: i,
-				NewACE:   ace,
+				Type:        DiffAdded,
+				OldPosition: -1,
+				NewPosition: i,
+				NewACE:      ace,
 			})
 		}
 		return diff
@@ -150,9 +152,10 @@ func compareACL(old, new *ACL) *ACLDiff {
 		}
 		for i, ace := range old.ACEs {
 			diff.ACEDiffs = append(diff.ACEDiffs, ACEDiff{
-				Type:     DiffRemoved,
-				Position: i,
-				OldACE:   ace,
+				Type:        DiffRemoved,
+				OldPosition: i,
+				NewPosition: -1,
+				OldACE:      ace,
 			})
 		}
 		return diff
@@ -213,10 +216,11 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 					if aceEqual(oldItem.ace, newItem.ace) {
 						// Found same ACE at different position
 						diffs = append(diffs, ACEDiff{
-							Type:     DiffReordered,
-							Position: newItem.index,
-							OldACE:   oldItem.ace,
-							NewACE:   newItem.ace,
+							Type:        DiffReordered,
+							OldPosition: oldItem.index,
+							NewPosition: newItem.index,
+							OldACE:      oldItem.ace,
+							NewACE:      newItem.ace,
 						})
 						matchedOld[oldItem.index] = true
 						matchedNew[newItem.index] = true
@@ -238,10 +242,11 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 					continue
 				}
 				diffs = append(diffs, ACEDiff{
-					Type:     DiffModified,
-					Position: newItem.index,
-					OldACE:   oldACE,
-					NewACE:   newItem.ace,
+					Type:        DiffModified,
+					OldPosition: i,
+					NewPosition: newItem.index,
+					OldACE:      oldACE,
+					NewACE:      newItem.ace,
 				})
 				matchedOld[i] = true
 				matchedNew[newItem.index] = true
@@ -253,9 +258,10 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 	for i, ace := range oldACEs {
 		if !matchedOld[i] {
 			diffs = append(diffs, ACEDiff{
-				Type:     DiffRemoved,
-				Position: i,
-				OldACE:   ace,
+				Type:        DiffRemoved,
+				OldPosition: i,
+				NewPosition: -1,
+				OldACE:      ace,
 			})
 		}
 	}
@@ -263,9 +269,10 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 	for i, ace := range newACEs {
 		if !matchedNew[i] {
 			diffs = append(diffs, ACEDiff{
-				Type:     DiffAdded,
-				Position: i,
-				NewACE:   ace,
+				Type:        DiffAdded,
+				OldPosition: -1,
+				NewPosition: i,
+				NewACE:      ace,
 			})
 		}
 	}
