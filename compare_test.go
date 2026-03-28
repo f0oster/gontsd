@@ -34,7 +34,7 @@ func TestCompare_AddingNewUser(t *testing.T) {
 	// Should have an added ACE
 	var foundAdded bool
 	for _, d := range diff.DACLDiff.ACEDiffs {
-		if d.Type == DiffAdded {
+		if d.Type.Has(DiffAdded) {
 			foundAdded = true
 			if d.NewACE.GetSID().Parsed != "S-1-5-21-75115020-4145467708-3593911600-1627" {
 				t.Errorf("added ACE SID = %s, want ...1627", d.NewACE.GetSID().Parsed)
@@ -69,7 +69,7 @@ func TestCompare_RemovingFlag(t *testing.T) {
 
 	var foundModified bool
 	for _, d := range diff.DACLDiff.ACEDiffs {
-		if d.Type == DiffModified {
+		if d.Type.Has(DiffModified) {
 			foundModified = true
 			if d.OldACE.GetMask() == d.NewACE.GetMask() {
 				t.Error("modified ACE should have different masks")
@@ -104,7 +104,7 @@ func TestCompare_AddingFlag(t *testing.T) {
 
 	var foundModified bool
 	for _, d := range diff.DACLDiff.ACEDiffs {
-		if d.Type == DiffModified {
+		if d.Type.Has(DiffModified) {
 			foundModified = true
 		}
 	}
@@ -152,7 +152,8 @@ func TestDiffType_String(t *testing.T) {
 		{DiffRemoved, "Removed"},
 		{DiffModified, "Modified"},
 		{DiffReordered, "Reordered"},
-		{DiffType(99), "Unknown"},
+		{DiffModified | DiffReordered, "Modified|Reordered"},
+		{0, "Unchanged"},
 	}
 	for _, tc := range tests {
 		if got := tc.dt.String(); got != tc.want {

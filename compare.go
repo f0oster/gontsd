@@ -3,31 +3,45 @@ package gontsd
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 // DiffType represents the type of change detected between two ACEs.
+// Values can be combined as a bitmask (e.g. DiffModified | DiffReordered).
 type DiffType int
 
 const (
-	DiffAdded DiffType = iota
-	DiffRemoved
-	DiffModified
-	DiffReordered
+	DiffAdded     DiffType = 1 << iota // ACE exists in new but not old
+	DiffRemoved                        // ACE exists in old but not new
+	DiffModified                       // ACE content changed
+	DiffReordered                      // ACE position changed
 )
 
+func (d DiffType) Has(flag DiffType) bool {
+	return d&flag != 0
+}
+
 func (d DiffType) String() string {
-	switch d {
-	case DiffAdded:
-		return "Added"
-	case DiffRemoved:
-		return "Removed"
-	case DiffModified:
-		return "Modified"
-	case DiffReordered:
-		return "Reordered"
-	default:
+	if d == 0 {
+		return "Unchanged"
+	}
+	var parts []string
+	if d.Has(DiffAdded) {
+		parts = append(parts, "Added")
+	}
+	if d.Has(DiffRemoved) {
+		parts = append(parts, "Removed")
+	}
+	if d.Has(DiffModified) {
+		parts = append(parts, "Modified")
+	}
+	if d.Has(DiffReordered) {
+		parts = append(parts, "Reordered")
+	}
+	if len(parts) == 0 {
 		return "Unknown"
 	}
+	return strings.Join(parts, "|")
 }
 
 // ACEDiff represents a single change to an ACE.
@@ -265,6 +279,7 @@ func (m *aceMatcher) matchReordered() {
 }
 
 // matchModified pairs ACEs that share an identity but have different content.
+// If the position also changed, both DiffModified and DiffReordered are set.
 func (m *aceMatcher) matchModified() {
 	for i, oldACE := range m.oldACEs {
 		if m.matchedOld[i] {
@@ -279,8 +294,12 @@ func (m *aceMatcher) matchModified() {
 			if m.matchedNew[newItem.index] {
 				continue
 			}
+			diffType := DiffModified
+			if newItem.index != i {
+				diffType |= DiffReordered
+			}
 			m.diffs = append(m.diffs, ACEDiff{
-				Type:        DiffModified,
+				Type:        diffType,
 				OldPosition: i,
 				NewPosition: newItem.index,
 				OldACE:      oldACE,

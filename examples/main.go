@@ -210,17 +210,21 @@ func printACLDiff(aclDiff *gontsd.ACLDiff, resolver resolve.SIDResolver, guidRes
 	}
 
 	for _, aceDiff := range aclDiff.ACEDiffs {
-		switch aceDiff.Type {
-		case gontsd.DiffAdded:
+		dt := aceDiff.Type
+
+		if dt.Has(gontsd.DiffAdded) {
 			fmt.Printf("  [+] Added at position %d:\n", aceDiff.NewPosition)
 			printACE(aceDiff.NewACE, resolver, guidResolver, "      ")
-		case gontsd.DiffRemoved:
+		} else if dt.Has(gontsd.DiffRemoved) {
 			fmt.Printf("  [-] Removed from position %d:\n", aceDiff.OldPosition)
 			printACE(aceDiff.OldACE, resolver, guidResolver, "      ")
-		case gontsd.DiffModified:
+		} else if dt.Has(gontsd.DiffModified) && dt.Has(gontsd.DiffReordered) {
+			fmt.Printf("  [~↔] Modified and moved from position %d to %d:\n", aceDiff.OldPosition, aceDiff.NewPosition)
+			printModifiedACE(aceDiff.OldACE, aceDiff.NewACE, resolver, guidResolver, "      ")
+		} else if dt.Has(gontsd.DiffModified) {
 			fmt.Printf("  [~] Modified at position %d:\n", aceDiff.NewPosition)
 			printModifiedACE(aceDiff.OldACE, aceDiff.NewACE, resolver, guidResolver, "      ")
-		case gontsd.DiffReordered:
+		} else if dt.Has(gontsd.DiffReordered) {
 			fmt.Printf("  [↔] Moved from position %d to %d:\n", aceDiff.OldPosition, aceDiff.NewPosition)
 			printACE(aceDiff.NewACE, resolver, guidResolver, "      ")
 		}
