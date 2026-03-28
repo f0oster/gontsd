@@ -1,22 +1,10 @@
-// Example: Parsing and Comparing NT Security Descriptors
+// Full example demonstrating parsing, comparing, and resolving
+// NT Security Descriptors with optional LDAP support.
 //
-// This example demonstrates:
-//   - Parsing binary ntSecurityDescriptor data
-//   - Comparing two security descriptors to detect changes
-//   - Resolving SIDs to human-readable names (well-known and LDAP)
-//   - Resolving schema GUIDs to extended right/property names
+// Run from the repository root:
 //
-// Run without LDAP (uses well-known SIDs only):
-//
-//	go run ./examples
-//
-// Run with LDAP resolution:
-//
-//	go run ./examples \
-//	  -ldap-server "ldap://dc.example.com:389" \
-//	  -ldap-basedn "DC=example,DC=com" \
-//	  -ldap-binddn "CN=user,DC=example,DC=com" \
-//	  -ldap-password "password"
+//	go run ./examples/full
+//	go run ./examples/full -ldap-server "ldaps://dc.example.com:636" ...
 package main
 
 import (
@@ -54,11 +42,10 @@ func main() {
 			fmt.Printf("Warning: Failed to connect to LDAP: %v\n", err)
 		} else {
 			defer client.Close()
-			sidResolver := resolve.NewLDAPSIDResolver(client)
 			resolver = resolve.ChainSIDResolver{
 				Resolvers: []resolve.SIDResolver{
 					resolve.WellKnownSIDResolver{},
-					sidResolver,
+					resolve.NewLDAPSIDResolver(client),
 				},
 			}
 
@@ -72,72 +59,71 @@ func main() {
 						ldapGUIDResolver,
 					},
 				}
-	
 			}
 		}
 	}
 
-	runTestCaseComparisons(resolver, guidResolver)
-	dumpSecurityDescriptor("./test_cases/root_domain/sd-domainroot.bin", resolver, guidResolver)
+	runComparisons(resolver, guidResolver)
+	dumpSecurityDescriptor("../test_cases/root_domain/sd-domainroot.bin", resolver, guidResolver)
 }
 
-func runTestCaseComparisons(resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver) {
+func runComparisons(resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver) {
 	fmt.Println()
-	fmt.Println("=== Test Case Comparisons ===")
+	fmt.Println("=== Comparisons ===")
 
-	testCases := []struct {
-		Name        string
-		DefaultPath string
-		ChangePath  string
+	comparisons := []struct {
+		Name    string
+		OldPath string
+		NewPath string
 	}{
 		{
-			Name:        "Added Principal To ACE",
-			DefaultPath: "./test_cases/adding_new_user/sd-filedomain_default.bin",
-			ChangePath:  "./test_cases/adding_new_user/sd-filedomain_change.bin",
+			Name:    "Added Principal To ACE",
+			OldPath: "../test_cases/adding_new_user/sd-filedomain_default.bin",
+			NewPath: "../test_cases/adding_new_user/sd-filedomain_change.bin",
 		},
 		{
-			Name:        "Removed Flag From ACE",
-			DefaultPath: "./test_cases/removing_flag/sd-filedomain_default.bin",
-			ChangePath:  "./test_cases/removing_flag/sd-filedomain_change.bin",
+			Name:    "Removed Flag From ACE",
+			OldPath: "../test_cases/removing_flag/sd-filedomain_default.bin",
+			NewPath: "../test_cases/removing_flag/sd-filedomain_change.bin",
 		},
 		{
-			Name:        "Added Flag To ACE",
-			DefaultPath: "./test_cases/adding_flag/sd-filedomain_default.bin",
-			ChangePath:  "./test_cases/adding_flag/sd-filedomain_change.bin",
+			Name:    "Added Flag To ACE",
+			OldPath: "../test_cases/adding_flag/sd-filedomain_default.bin",
+			NewPath: "../test_cases/adding_flag/sd-filedomain_change.bin",
 		},
 	}
 
-	for _, tc := range testCases {
-		fmt.Printf("\n=== Test Case: %s ===\n", tc.Name)
+	for _, c := range comparisons {
+		fmt.Printf("\n=== %s ===\n", c.Name)
 
-		defaultData, err := os.ReadFile(tc.DefaultPath)
+		oldData, err := os.ReadFile(c.OldPath)
 		if err != nil {
-			fmt.Printf("Failed to read default file: %v\n", err)
+			fmt.Printf("Failed to read old file: %v\n", err)
 			continue
 		}
 
-		changeData, err := os.ReadFile(tc.ChangePath)
+		newData, err := os.ReadFile(c.NewPath)
 		if err != nil {
-			fmt.Printf("Failed to read change file: %v\n", err)
+			fmt.Printf("Failed to read new file: %v\n", err)
 			continue
 		}
 
-		defaultSD, err := gontsd.Parse(defaultData)
+		oldSD, err := gontsd.Parse(oldData)
 		if err != nil {
-			fmt.Printf("Failed to parse default SD: %v\n", err)
+			fmt.Printf("Failed to parse old SD: %v\n", err)
 			continue
 		}
 
-		changeSD, err := gontsd.Parse(changeData)
+		newSD, err := gontsd.Parse(newData)
 		if err != nil {
-			fmt.Printf("Failed to parse change SD: %v\n", err)
+			fmt.Printf("Failed to parse new SD: %v\n", err)
 			continue
 		}
 
 		// Batch-resolve all SIDs from both descriptors upfront.
-		resolve.ResolveBatchSIDs(resolver, append(defaultSD.CollectSIDs(), changeSD.CollectSIDs()...))
+		resolve.ResolveBatchSIDs(resolver, append(oldSD.CollectSIDs(), newSD.CollectSIDs()...))
 
-		diff := gontsd.Compare(defaultSD, changeSD)
+		diff := gontsd.Compare(oldSD, newSD)
 		printDiff(diff, resolver, guidResolver)
 	}
 }
@@ -220,10 +206,10 @@ func printACLDiff(aclDiff *gontsd.ACLDiff, resolver resolve.SIDResolver, guidRes
 			printACE(aceDiff.OldACE, resolver, guidResolver, "      ")
 		} else if dt.Has(gontsd.DiffModified) && dt.Has(gontsd.DiffReordered) {
 			fmt.Printf("  [~↔] Modified and moved from position %d to %d:\n", aceDiff.OldPosition, aceDiff.NewPosition)
-			printModifiedACE(aceDiff.OldACE, aceDiff.NewACE, resolver, guidResolver, "      ")
+			printModifiedACE(aceDiff, resolver, guidResolver, "      ")
 		} else if dt.Has(gontsd.DiffModified) {
 			fmt.Printf("  [~] Modified at position %d:\n", aceDiff.NewPosition)
-			printModifiedACE(aceDiff.OldACE, aceDiff.NewACE, resolver, guidResolver, "      ")
+			printModifiedACE(aceDiff, resolver, guidResolver, "      ")
 		} else if dt.Has(gontsd.DiffReordered) {
 			fmt.Printf("  [↔] Moved from position %d to %d:\n", aceDiff.OldPosition, aceDiff.NewPosition)
 			printACE(aceDiff.NewACE, resolver, guidResolver, "      ")
@@ -237,16 +223,16 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 		return
 	}
 
-	fmt.Printf("%s%s:\n", indent, getACETypeName(ace))
+	fmt.Printf("%s%sACE:\n", indent, ace.Type())
 	fmt.Printf("%s  SID:   %s\n", indent, resolveSID(ace.GetSID(), resolver))
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
 	fmt.Printf("%s  Rights: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUIDWithDetails(objGUID, guidResolver, indent+"            "))
+		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUID(objGUID, guidResolver, indent+"            "))
 	}
 
 	if inhGUID := ace.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver))
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver, indent+"                     "))
 	}
 
 	if appData := ace.GetApplicationData(); len(appData) > 0 {
@@ -266,21 +252,7 @@ func resolveSID(sid *gontsd.SID, resolver resolve.SIDResolver) string {
 	return fmt.Sprintf("%s (%s)", sid.Parsed, name)
 }
 
-func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver) string {
-	if guid == "" {
-		return ""
-	}
-	if resolver == nil {
-		return guid
-	}
-	info, err := resolver.ResolveGUID(guid)
-	if err != nil {
-		return guid
-	}
-	return fmt.Sprintf("%s (%s) [%s]", info.Name, guid, info.Type)
-}
-
-func resolveGUIDWithDetails(guid string, resolver resolve.SchemaGUIDResolver, indent string) string {
+func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver, indent string) string {
 	if guid == "" {
 		return ""
 	}
@@ -293,10 +265,10 @@ func resolveGUIDWithDetails(guid string, resolver resolve.SchemaGUIDResolver, in
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("%s (%s) [%s]", info.Name, guid, info.Type))
+	fmt.Fprintf(&result, "%s (%s) [%s]", info.Name, guid, info.Type)
 
 	if info.Description != "" {
-		result.WriteString(fmt.Sprintf("\n%s  Description: %s", indent, info.Description))
+		fmt.Fprintf(&result, "\n%s  Description: %s", indent, info.Description)
 	}
 	if len(info.AppliesTo) > 0 {
 		names := make([]string, 0, len(info.AppliesTo))
@@ -307,30 +279,30 @@ func resolveGUIDWithDetails(guid string, resolver resolve.SchemaGUIDResolver, in
 				names = append(names, entry.GUID)
 			}
 		}
-		result.WriteString(fmt.Sprintf("\n%s  Applies to: %s", indent, strings.Join(names, ", ")))
+		fmt.Fprintf(&result, "\n%s  Applies to: %s", indent, strings.Join(names, ", "))
 	}
 
 	return result.String()
 }
 
-func printModifiedACE(oldACE, newACE gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver, indent string) {
-	if oldACE == nil || newACE == nil {
+func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver, indent string) {
+	if d.OldACE == nil || d.NewACE == nil {
 		fmt.Printf("%s<nil>\n", indent)
 		return
 	}
 
-	added, removed, unchanged := compareFlagSlices(oldACE.GetAccessRights(), newACE.GetAccessRights())
+	added, removed, unchanged := d.CompareAccessRights()
 
-	fmt.Printf("%s%s:\n", indent, getACETypeName(newACE))
-	fmt.Printf("%s  SID:  %s\n", indent, resolveSID(newACE.GetSID(), resolver))
-	fmt.Printf("%s  Mask: 0x%08X -> 0x%08X\n", indent, oldACE.GetMask(), newACE.GetMask())
+	fmt.Printf("%s%sACE:\n", indent, d.NewACE.Type())
+	fmt.Printf("%s  SID:  %s\n", indent, resolveSID(d.NewACE.GetSID(), resolver))
+	fmt.Printf("%s  Mask: 0x%08X -> 0x%08X\n", indent, d.OldACE.GetMask(), d.NewACE.GetMask())
 
-	if objGUID := newACE.GetObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUIDWithDetails(objGUID, guidResolver, indent+"            "))
+	if objGUID := d.NewACE.GetObjectTypeGUID(); objGUID != "" {
+		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUID(objGUID, guidResolver, indent+"            "))
 	}
 
-	if inhGUID := newACE.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver))
+	if inhGUID := d.NewACE.GetInheritedObjectTypeGUID(); inhGUID != "" {
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver, indent+"                     "))
 	}
 
 	if len(removed) > 0 {
@@ -344,38 +316,3 @@ func printModifiedACE(oldACE, newACE gontsd.ACE, resolver resolve.SIDResolver, g
 	}
 }
 
-func compareFlagSlices(oldFlags, newFlags []string) (added, removed, unchanged []string) {
-	oldSet := make(map[string]bool)
-	newSet := make(map[string]bool)
-
-	for _, f := range oldFlags {
-		oldSet[f] = true
-	}
-	for _, f := range newFlags {
-		newSet[f] = true
-	}
-
-	for _, f := range oldFlags {
-		if !newSet[f] {
-			removed = append(removed, f)
-		}
-	}
-
-	for _, f := range newFlags {
-		if !oldSet[f] {
-			added = append(added, f)
-		}
-	}
-
-	for _, f := range oldFlags {
-		if newSet[f] {
-			unchanged = append(unchanged, f)
-		}
-	}
-
-	return added, removed, unchanged
-}
-
-func getACETypeName(ace gontsd.ACE) string {
-	return ace.Type().String() + "ACE"
-}

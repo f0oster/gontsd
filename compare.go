@@ -53,6 +53,40 @@ type ACEDiff struct {
 	NewACE      ACE // nil if Removed
 }
 
+// CompareAccessRights returns the access rights that were added, removed,
+// and unchanged between the old and new ACE. Returns nil slices if either
+// ACE is nil.
+func (d ACEDiff) CompareAccessRights() (added, removed, unchanged []string) {
+	if d.OldACE == nil || d.NewACE == nil {
+		return nil, nil, nil
+	}
+
+	oldSet := make(map[string]bool)
+	newSet := make(map[string]bool)
+
+	for _, f := range d.OldACE.GetAccessRights() {
+		oldSet[f] = true
+	}
+	for _, f := range d.NewACE.GetAccessRights() {
+		newSet[f] = true
+	}
+
+	for _, f := range d.OldACE.GetAccessRights() {
+		if !newSet[f] {
+			removed = append(removed, f)
+		} else {
+			unchanged = append(unchanged, f)
+		}
+	}
+	for _, f := range d.NewACE.GetAccessRights() {
+		if !oldSet[f] {
+			added = append(added, f)
+		}
+	}
+
+	return added, removed, unchanged
+}
+
 // ACLDiff represents the changes between two ACLs.
 type ACLDiff struct {
 	RevisionChanged bool

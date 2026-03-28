@@ -119,20 +119,28 @@ name, _ := sidResolver.Resolve(sd.OwnerSID)
 
 ## Examples
 
-See the [examples](./examples) directory for a working demo that parses, compares, and resolves security descriptors.
+Focused examples in the [examples](./examples) directory:
+
+- **[parse](./examples/parse)** — parse a descriptor and inspect its contents
+- **[compare](./examples/compare)** — compare two descriptors and print the diff
+- **[resolve](./examples/resolve)** — resolve SIDs and GUIDs via LDAP
+- **[full](./examples/full)** — comprehensive demo combining all of the above
 
 ```bash
-# Well-known SIDs only
-go run ./examples
+# Parse a descriptor
+go run ./examples/parse ./examples/test_cases/root_domain/sd-domainroot.bin
 
-# With LDAP resolution
-go run ./examples \
+# Compare two descriptors
+go run ./examples/compare \
+  ./examples/test_cases/adding_flag/sd-filedomain_default.bin \
+  ./examples/test_cases/adding_flag/sd-filedomain_change.bin
+
+# Full demo with LDAP
+go run ./examples/full \
   -ldap-server "ldaps://dc.example.com:636" \
   -ldap-basedn "DC=example,DC=com" \
   -ldap-binddn "CN=user,DC=example,DC=com" \
-  -ldap-password "password" \
-  -ldap-tls \
-  -ldap-insecure
+  -ldap-password "password"
 ```
 
 ## License
