@@ -55,7 +55,7 @@ func (c *LDAPClient) BaseDN() string {
 // Close closes the LDAP connection.
 func (c *LDAPClient) Close() error {
 	if c.conn != nil {
-		c.conn.Close()
+		return c.conn.Close()
 	}
 	return nil
 }

@@ -26,7 +26,7 @@ func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, err
 	}
 
 	if err := r.preloadExtendedRights(); err != nil {
-		fmt.Printf("Warning: Failed to preload extended rights: %v\n", err)
+		return nil, fmt.Errorf("failed to preload extended rights: %w", err)
 	}
 
 	return r, nil
@@ -125,7 +125,10 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
 
 	// schemaIDGUID is stored as binary, need to convert GUID string to binary escape format
-	binaryFilter := guidStringToBinaryFilter(guid)
+	binaryFilter, err := guidStringToBinaryFilter(guid)
+	if err != nil {
+		return SchemaGUIDInfo{}, fmt.Errorf("invalid GUID %q: %w", guid, err)
+	}
 
 	searchRequest := ldap.NewSearchRequest(
 		schemaDN,
@@ -186,15 +189,15 @@ func determineExtendedRightType(validAccesses string) string {
 	}
 }
 
-func guidStringToBinaryFilter(guid string) string {
+func guidStringToBinaryFilter(guid string) (string, error) {
 	clean := strings.ReplaceAll(guid, "-", "")
 	if len(clean) != 32 {
-		return ""
+		return "", fmt.Errorf("invalid GUID length: expected 32 hex chars, got %d", len(clean))
 	}
 
 	bytes, err := hex.DecodeString(clean)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("invalid GUID hex: %w", err)
 	}
 
 	bytes[0], bytes[1], bytes[2], bytes[3] = bytes[3], bytes[2], bytes[1], bytes[0]
@@ -205,7 +208,7 @@ func guidStringToBinaryFilter(guid string) string {
 	for _, b := range bytes {
 		result.WriteString(fmt.Sprintf("\\%02x", b))
 	}
-	return result.String()
+	return result.String(), nil
 }
 
 func (r *LDAPSchemaGUIDResolver) ClearCache() {
