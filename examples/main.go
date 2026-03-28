@@ -249,15 +249,8 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver))
 	}
 
-	switch a := ace.(type) {
-	case *gontsd.AccessAllowedCallbackACE:
-		fmt.Printf("%s  Condition: %d bytes\n", indent, len(a.ApplicationData))
-	case *gontsd.AccessDeniedCallbackACE:
-		fmt.Printf("%s  Condition: %d bytes\n", indent, len(a.ApplicationData))
-	case *gontsd.AccessAllowedCallbackObjectACE:
-		fmt.Printf("%s  Condition: %d bytes\n", indent, len(a.ApplicationData))
-	case *gontsd.AccessDeniedCallbackObjectACE:
-		fmt.Printf("%s  Condition: %d bytes\n", indent, len(a.ApplicationData))
+	if appData := ace.GetApplicationData(); len(appData) > 0 {
+		fmt.Printf("%s  Condition: %d bytes\n", indent, len(appData))
 	}
 }
 

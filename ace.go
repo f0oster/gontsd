@@ -66,6 +66,7 @@ type ACE interface {
 	GetMask() uint32
 	GetAceFlags() uint8
 	GetAccessRights() []string
+	GetApplicationData() []byte
 	GetObjectTypeGUID() string
 	GetInheritedObjectTypeGUID() string
 }
@@ -83,7 +84,8 @@ func (b *aceBase) Size() uint16               { return b.Header.AceSize }
 func (b *aceBase) GetSID() *SID               { return b.SID }
 func (b *aceBase) GetMask() uint32            { return b.Mask }
 func (b *aceBase) GetAceFlags() uint8         { return b.Header.AceFlags }
-func (b *aceBase) GetAccessRights() []string  { return b.AccessRights }
+func (b *aceBase) GetAccessRights() []string          { return b.AccessRights }
+func (b *aceBase) GetApplicationData() []byte          { return nil }
 func (b *aceBase) GetObjectTypeGUID() string          { return "" }
 func (b *aceBase) GetInheritedObjectTypeGUID() string { return "" }
 
@@ -152,6 +154,7 @@ type AccessAllowedCallbackACE struct {
 	ApplicationData []byte
 }
 
+func (a *AccessAllowedCallbackACE) GetApplicationData() []byte { return a.ApplicationData }
 func (a *AccessAllowedCallbackACE) String() string {
 	return fmt.Sprintf("AccessAllowedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
@@ -162,6 +165,7 @@ type AccessDeniedCallbackACE struct {
 	ApplicationData []byte
 }
 
+func (a *AccessDeniedCallbackACE) GetApplicationData() []byte { return a.ApplicationData }
 func (a *AccessDeniedCallbackACE) String() string {
 	return fmt.Sprintf("AccessDeniedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
 }
@@ -175,6 +179,7 @@ type AccessAllowedCallbackObjectACE struct {
 	ApplicationData     []byte
 }
 
+func (a *AccessAllowedCallbackObjectACE) GetApplicationData() []byte { return a.ApplicationData }
 func (a *AccessAllowedCallbackObjectACE) GetObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
@@ -196,6 +201,7 @@ type AccessDeniedCallbackObjectACE struct {
 	ApplicationData     []byte
 }
 
+func (a *AccessDeniedCallbackObjectACE) GetApplicationData() []byte { return a.ApplicationData }
 func (a *AccessDeniedCallbackObjectACE) GetObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }

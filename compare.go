@@ -375,22 +375,8 @@ func aceEqual(a, b ACE) bool {
 	if a.GetInheritedObjectTypeGUID() != b.GetInheritedObjectTypeGUID() {
 		return false
 	}
-	if !bytes.Equal(aceAppData(a), aceAppData(b)) {
+	if !bytes.Equal(a.GetApplicationData(), b.GetApplicationData()) {
 		return false
 	}
 	return true
-}
-
-func aceAppData(a ACE) []byte {
-	switch v := a.(type) {
-	case *AccessAllowedCallbackACE:
-		return v.ApplicationData
-	case *AccessDeniedCallbackACE:
-		return v.ApplicationData
-	case *AccessAllowedCallbackObjectACE:
-		return v.ApplicationData
-	case *AccessDeniedCallbackObjectACE:
-		return v.ApplicationData
-	}
-	return nil
 }
