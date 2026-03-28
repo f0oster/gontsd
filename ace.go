@@ -8,8 +8,10 @@ import (
 const (
 	ACCESS_ALLOWED_ACE_TYPE                 = 0x00
 	ACCESS_DENIED_ACE_TYPE                  = 0x01
+	SYSTEM_AUDIT_ACE_TYPE                   = 0x02
 	ACCESS_ALLOWED_OBJECT_ACE_TYPE          = 0x05
 	ACCESS_DENIED_OBJECT_ACE_TYPE           = 0x06
+	SYSTEM_AUDIT_OBJECT_ACE_TYPE            = 0x07
 	ACCESS_ALLOWED_CALLBACK_ACE_TYPE        = 0x09
 	ACCESS_DENIED_CALLBACK_ACE_TYPE         = 0x0A
 	ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE = 0x0B
@@ -202,6 +204,25 @@ func (a *AccessDeniedCallbackObjectACE) String() string {
 }`, a.Mask, a.SID, a.FlagStrings, len(a.ApplicationData))
 }
 
+// RawACE represents an ACE type that is not explicitly supported.
+// The raw bytes are preserved so the ACE can still be compared and displayed.
+type RawACE struct {
+	Header  ACEHeader
+	RawData []byte
+}
+
+func (a *RawACE) Type() uint8                        { return a.Header.AceType }
+func (a *RawACE) Size() uint16                       { return a.Header.AceSize }
+func (a *RawACE) GetSID() *SID                       { return nil }
+func (a *RawACE) GetMask() uint32                    { return 0 }
+func (a *RawACE) GetFlags() []string                 { return nil }
+func (a *RawACE) GetObjectTypeGUID() string          { return "" }
+func (a *RawACE) GetInheritedObjectTypeGUID() string { return "" }
+
+func (a *RawACE) String() string {
+	return fmt.Sprintf("RawACE { Type: 0x%02X, Size: %d }", a.Header.AceType, a.Header.AceSize)
+}
+
 func parseACE(data []byte) (ACE, int, error) {
 	if len(data) < 8 {
 		return nil, 0, fmt.Errorf("data too short for ACE header")
@@ -257,7 +278,18 @@ func parseACE(data []byte) (ACE, int, error) {
 		}
 		return a, int(a.Size()), nil
 	default:
-		return nil, 0, fmt.Errorf("unsupported ACE type: 0x%02X", data[0])
+		// For unsupported ACE types (e.g. SYSTEM_AUDIT), preserve raw bytes
+		// so parsing can continue past them.
+		header, err := parseACEHeader(data)
+		if err != nil {
+			return nil, 0, err
+		}
+		if int(header.AceSize) > len(data) {
+			return nil, 0, fmt.Errorf("ACE type 0x%02X claims size %d, but only %d bytes available", header.AceType, header.AceSize, len(data))
+		}
+		raw := make([]byte, header.AceSize)
+		copy(raw, data[:header.AceSize])
+		return &RawACE{Header: header, RawData: raw}, int(header.AceSize), nil
 	}
 }
 

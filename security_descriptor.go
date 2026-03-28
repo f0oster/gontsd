@@ -71,6 +71,27 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		sd.DACL = dacl
 	}
 
+	if sd.SaclOffset > 0 && int(sd.SaclOffset) < len(descriptor) {
+		sacl := &ACL{
+			Revision: descriptor[sd.SaclOffset],
+			Sbz1:     descriptor[sd.SaclOffset+1],
+			Size:     binary.LittleEndian.Uint16(descriptor[sd.SaclOffset+2:]),
+			Count:    binary.LittleEndian.Uint16(descriptor[sd.SaclOffset+4:]),
+			Sbz2:     binary.LittleEndian.Uint16(descriptor[sd.SaclOffset+6:]),
+		}
+		offset := sd.SaclOffset + 8
+		sacl.ACEs = make([]ACE, sacl.Count)
+		for i := 0; i < int(sacl.Count); i++ {
+			ace, aceLen, err := parseACE(descriptor[offset:])
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse SACL ACE %d: %w", i, err)
+			}
+			sacl.ACEs[i] = ace
+			offset += uint32(aceLen)
+		}
+		sd.SACL = sacl
+	}
+
 	if sd.OwnerOffset > 0 && int(sd.OwnerOffset) < len(descriptor) {
 		ownerSID, _, err := parseSID(descriptor[sd.OwnerOffset:])
 		if err != nil {

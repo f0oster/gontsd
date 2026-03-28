@@ -61,9 +61,22 @@ func TestParseACE_UnsupportedType(t *testing.T) {
 	sid := buildSIDBinary(1, 5, 18)
 	data := buildSimpleACE(0xFF, 0x00, 0x00000000, sid)
 
-	_, _, err := parseACE(data)
-	if err == nil {
-		t.Error("parseACE() expected error for unsupported type, got nil")
+	ace, aceLen, err := parseACE(data)
+	if err != nil {
+		t.Fatalf("parseACE() error: %v", err)
+	}
+	raw, ok := ace.(*RawACE)
+	if !ok {
+		t.Fatalf("expected *RawACE, got %T", ace)
+	}
+	if raw.Type() != 0xFF {
+		t.Errorf("Type() = 0x%02X, want 0xFF", raw.Type())
+	}
+	if aceLen != len(data) {
+		t.Errorf("aceLen = %d, want %d", aceLen, len(data))
+	}
+	if raw.GetSID() != nil {
+		t.Error("RawACE.GetSID() should return nil")
 	}
 }
 
