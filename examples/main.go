@@ -384,24 +384,5 @@ func compareFlagSlices(oldFlags, newFlags []string) (added, removed, unchanged [
 }
 
 func getACETypeName(ace gontsd.ACE) string {
-	switch ace.(type) {
-	case *gontsd.AccessAllowedACE:
-		return "AccessAllowedACE"
-	case *gontsd.AccessDeniedACE:
-		return "AccessDeniedACE"
-	case *gontsd.AccessAllowedObjectACE:
-		return "AccessAllowedObjectACE"
-	case *gontsd.AccessDeniedObjectACE:
-		return "AccessDeniedObjectACE"
-	case *gontsd.AccessAllowedCallbackACE:
-		return "AccessAllowedCallbackACE"
-	case *gontsd.AccessDeniedCallbackACE:
-		return "AccessDeniedCallbackACE"
-	case *gontsd.AccessAllowedCallbackObjectACE:
-		return "AccessAllowedCallbackObjectACE"
-	case *gontsd.AccessDeniedCallbackObjectACE:
-		return "AccessDeniedCallbackObjectACE"
-	default:
-		return "UnknownACE"
-	}
+	return ace.Type().String() + "ACE"
 }
