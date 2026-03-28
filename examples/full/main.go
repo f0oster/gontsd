@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/f0oster/gontsd"
 	"github.com/f0oster/gontsd/resolve"
@@ -228,11 +227,10 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
 	fmt.Printf("%s  Rights: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUID(objGUID, guidResolver, indent+"            "))
+		printGUIDInfo(objGUID, "ObjectType", guidResolver, indent)
 	}
-
 	if inhGUID := ace.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver, indent+"                     "))
+		printGUIDInfo(inhGUID, "InheritedObjectType", guidResolver, indent)
 	}
 
 	if appData := ace.GetApplicationData(); len(appData) > 0 {
@@ -240,37 +238,19 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	}
 }
 
-func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver, indent string) string {
-	if guid == "" {
-		return ""
-	}
-	if resolver == nil {
-		return guid
-	}
+func printGUIDInfo(guid, label string, resolver resolve.SchemaGUIDResolver, indent string) {
 	info, err := resolver.ResolveGUID(guid)
 	if err != nil {
-		return guid
+		fmt.Printf("%s  %s: %s\n", indent, label, guid)
+		return
 	}
-
-	var result strings.Builder
-	fmt.Fprintf(&result, "%s (%s) [%s]", info.Name, guid, info.Type)
-
+	fmt.Printf("%s  %s: %s\n", indent, label, info)
 	if info.Description != "" {
-		fmt.Fprintf(&result, "\n%s  Description: %s", indent, info.Description)
+		fmt.Printf("%s    Description: %s\n", indent, info.Description)
 	}
 	if len(info.AppliesTo) > 0 {
-		names := make([]string, 0, len(info.AppliesTo))
-		for _, entry := range info.AppliesTo {
-			if entry.Name != "" {
-				names = append(names, entry.Name)
-			} else {
-				names = append(names, entry.GUID)
-			}
-		}
-		fmt.Fprintf(&result, "\n%s  Applies to: %s", indent, strings.Join(names, ", "))
+		fmt.Printf("%s    Applies to: %s\n", indent, info.FormatAppliesTo())
 	}
-
-	return result.String()
 }
 
 func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver, indent string) {
@@ -286,11 +266,10 @@ func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolv
 	fmt.Printf("%s  Mask: 0x%08X -> 0x%08X\n", indent, d.OldACE.GetMask(), d.NewACE.GetMask())
 
 	if objGUID := d.NewACE.GetObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolveGUID(objGUID, guidResolver, indent+"            "))
+		printGUIDInfo(objGUID, "ObjectType", guidResolver, indent)
 	}
-
 	if inhGUID := d.NewACE.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolveGUID(inhGUID, guidResolver, indent+"                     "))
+		printGUIDInfo(inhGUID, "InheritedObjectType", guidResolver, indent)
 	}
 
 	if len(removed) > 0 {

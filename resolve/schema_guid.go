@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -21,6 +22,27 @@ type SchemaGUIDInfo struct {
 	GUID        string
 	Description string
 	AppliesTo   []AppliesToEntry
+}
+
+func (e AppliesToEntry) String() string {
+	if e.Name != "" {
+		return e.Name
+	}
+	return e.GUID
+}
+
+func (info SchemaGUIDInfo) String() string {
+	return fmt.Sprintf("%s (%s) [%s]", info.Name, info.GUID, info.Type)
+}
+
+// FormatAppliesTo returns the AppliesTo entries as a comma-separated string
+// of names, falling back to GUIDs for unresolved entries.
+func (info SchemaGUIDInfo) FormatAppliesTo() string {
+	names := make([]string, len(info.AppliesTo))
+	for i, entry := range info.AppliesTo {
+		names[i] = entry.String()
+	}
+	return strings.Join(names, ", ")
 }
 
 // SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
