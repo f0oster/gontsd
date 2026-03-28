@@ -1,6 +1,6 @@
 # gontsd
 
-A Go parser for Windows NT Security Descriptors (`ntSecurityDescriptor`). Platform independent.
+A pure Go library for parsing, comparing, and resolving Windows NT Security Descriptors (`ntSecurityDescriptor`). No Windows APIs required.
 
 ## Install
 
@@ -8,97 +8,131 @@ A Go parser for Windows NT Security Descriptors (`ntSecurityDescriptor`). Platfo
 go get github.com/f0oster/gontsd
 ```
 
-## Usage
+## Parsing
 
 ```go
-import "github.com/f0oster/gontsd"
-
-// Parse binary security descriptor
 sd, err := gontsd.Parse(data)
+if err != nil {
+    log.Fatal(err)
+}
 
-// Access parsed fields
-fmt.Println(sd.OwnerSID)
-fmt.Println(sd.GroupSID)
-fmt.Println(sd.DACL)
+fmt.Println(sd.OwnerSID.Parsed)   // "S-1-5-32-544"
+fmt.Println(sd.GroupSID.Parsed)   // "S-1-5-32-544"
+
+// DACL and SACL are both parsed when present
+for _, ace := range sd.DACL.ACEs {
+    fmt.Printf("%s %s %v\n", ace.Type(), ace.GetSID().Parsed, ace.GetAccessRights())
+}
 ```
 
-## Comparing Security Descriptors
+## Comparing
+
+`Compare` detects changes to the owner, group, control flags, DACL, and SACL between two security descriptors. Changes can be compound — an ACE that is both modified and moved will have `DiffModified | DiffReordered` set.
 
 ```go
 diff := gontsd.Compare(oldSD, newSD)
 
 if diff.HasChanges() {
-    if diff.OwnerChanged {
-        fmt.Printf("Owner: %s -> %s\n", diff.OldOwner, diff.NewOwner)
-    }
-
-    if diff.DACLDiff != nil {
-        for _, aceDiff := range diff.DACLDiff.ACEDiffs {
-            switch aceDiff.Type {
-            case gontsd.DiffAdded:
-                fmt.Printf("Added: %s\n", aceDiff.NewACE.GetSID())
-            case gontsd.DiffRemoved:
-                fmt.Printf("Removed: %s\n", aceDiff.OldACE.GetSID())
-            case gontsd.DiffModified:
-                fmt.Printf("Modified: %s\n", aceDiff.NewACE.GetSID())
-            }
+    for _, d := range diff.DACLDiff.ACEDiffs {
+        if d.Type.Has(gontsd.DiffAdded) {
+            fmt.Printf("[+] %s\n", d.NewACE.GetSID().Parsed)
+        }
+        if d.Type.Has(gontsd.DiffRemoved) {
+            fmt.Printf("[-] %s\n", d.OldACE.GetSID().Parsed)
+        }
+        if d.Type.Has(gontsd.DiffModified) {
+            fmt.Printf("[~] %s mask 0x%X -> 0x%X\n",
+                d.NewACE.GetSID().Parsed, d.OldACE.GetMask(), d.NewACE.GetMask())
         }
     }
 }
 ```
 
-## SID & GUID Resolution
+## SID and GUID Resolution
 
-The `resolve` package provides resolvers for translating SIDs and schema GUIDs to human-readable names.
+The `resolve` package translates raw SIDs and schema GUIDs into human-readable names.
 
-Requires [go-ldap](https://github.com/go-ldap/ldap) for LDAP resolution.
+### Without LDAP
+
+`WellKnownSIDResolver` resolves built-in Windows SIDs and well-known domain RIDs without a network connection:
 
 ```go
-import "github.com/f0oster/gontsd/resolve"
-
-// Well-known SIDs (no LDAP required)
 resolver := resolve.WellKnownSIDResolver{}
-name, _ := resolver.Resolve(sid) // "BUILTIN\Administrators"
+name, err := resolver.Resolve(sd.OwnerSID) // "BUILTIN\Administrators"
+```
 
-// LDAP client for domain resolution
-client, _ := resolve.NewLDAPClient(resolve.LDAPConfig{
-    Server:   "ldaps://dc.example.com:636",
-    BaseDN:   "DC=example,DC=com",
-    BindDN:   "CN=user,DC=example,DC=com",
+`WellKnownSchemaGUIDResolver` resolves well-known schema classes, attributes, and extended rights:
+
+```go
+guidResolver := resolve.WellKnownSchemaGUIDResolver{}
+info, err := guidResolver.ResolveGUID(ace.GetObjectTypeGUID())
+fmt.Println(info.Name, info.Type) // "DS-Replication-Get-Changes-All" "extendedRight"
+```
+
+### With LDAP
+
+For full resolution against Active Directory, chain the well-known resolvers with LDAP-backed ones:
+
+```go
+client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
+    Server: "ldaps://dc.example.com:636",
+    BaseDN: "DC=example,DC=com",
+    BindDN: "CN=user,DC=example,DC=com",
     Password: "password",
 })
+if err != nil {
+    log.Fatal(err)
+}
 defer client.Close()
 
-// SID resolver
-sidResolver := resolve.NewLDAPSIDResolver(client)
-name, _ := sidResolver.Resolve(sid) // "jsmith (CN=jsmith,OU=Users,DC=example,DC=com)"
+// SID resolution: well-known first, then LDAP for domain-specific SIDs
+sidResolver := resolve.ChainSIDResolver{
+    Resolvers: []resolve.SIDResolver{
+        resolve.WellKnownSIDResolver{},
+        resolve.NewLDAPSIDResolver(client),
+    },
+}
 
-// Schema GUID resolver (extended rights, property sets, attributes)
-guidResolver, _ := resolve.NewLDAPSchemaGUIDResolver(client)
-info, _ := guidResolver.ResolveGUID("1131f6ad-9c07-11d1-f79f-00c04fc2dcd2")
-// info.Name: "DS-Replication-Get-Changes-All"
-// info.Type: "extendedRight"
+// GUID resolution: well-known first, then LDAP schema
+ldapGUID, err := resolve.NewLDAPSchemaGUIDResolver(client)
+if err != nil {
+    log.Fatal(err)
+}
+guidResolver := resolve.ChainSchemaGUIDResolver{
+    Resolvers: []resolve.SchemaGUIDResolver{
+        resolve.WellKnownSchemaGUIDResolver{},
+        ldapGUID,
+    },
+}
+```
+
+### Batch SID resolution
+
+For security descriptors with many ACEs, resolve all SIDs in bulk to minimise LDAP round-trips. Subsequent individual `Resolve` calls will hit the cache:
+
+```go
+resolve.ResolveBatchSIDs(sidResolver, sd.CollectSIDs())
+
+// Now individual calls are cache hits
+name, _ := sidResolver.Resolve(sd.OwnerSID)
 ```
 
 ## Examples
 
-See the [examples](./examples) directory for a complete example:
-- Parsing and dumping security descriptors
-- Comparing two security descriptors
-- SID and GUID resolution with LDAP
-
-Sample output showing resolved SIDs, GUIDs, and ACE diffs, can be seen in [examples/sample_output.md](./examples/sample_output.md).
+See the [examples](./examples) directory for a working demo that parses, compares, and resolves security descriptors.
 
 ```bash
-# Run with well-known SIDs only
+# Well-known SIDs only
 go run ./examples
 
-# Run with LDAP resolution
+# With LDAP resolution
 go run ./examples \
-  -ldap-server "ldap://dc.example.com:389" \
+  -ldap-server "ldaps://dc.example.com:636" \
   -ldap-basedn "DC=example,DC=com" \
   -ldap-binddn "CN=user,DC=example,DC=com" \
-  -ldap-password "password"
+  -ldap-password "password" \
+  -ldap-tls \
+  -ldap-insecure
 ```
 
 ## License
