@@ -63,7 +63,7 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		for i := 0; i < int(dacl.Count); i++ {
 			ace, aceLen, err := parseACE(descriptor[offset:])
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse DACL ACE %d: %w", i, err)
 			}
 			dacl.ACEs[i] = ace
 			offset += uint32(aceLen)
