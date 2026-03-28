@@ -227,10 +227,18 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
 	fmt.Printf("%s  Rights: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
-		printGUIDInfo(objGUID, "ObjectType", guidResolver, indent)
+		if info, err := guidResolver.ResolveGUID(objGUID); err == nil {
+			fmt.Printf("%s  ObjectType: %s - %s\n", indent, info, info.Description)
+		} else {
+			fmt.Printf("%s  ObjectType: %s\n", indent, objGUID)
+		}
 	}
 	if inhGUID := ace.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		printGUIDInfo(inhGUID, "InheritedObjectType", guidResolver, indent)
+		if info, err := guidResolver.ResolveGUID(inhGUID); err == nil {
+			fmt.Printf("%s  InheritedObjectType: %s - %s\n", indent, info, info.Description)
+		} else {
+			fmt.Printf("%s  InheritedObjectType: %s\n", indent, inhGUID)
+		}
 	}
 
 	if appData := ace.GetApplicationData(); len(appData) > 0 {
@@ -238,20 +246,6 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	}
 }
 
-func printGUIDInfo(guid, label string, resolver resolve.SchemaGUIDResolver, indent string) {
-	info, err := resolver.ResolveGUID(guid)
-	if err != nil {
-		fmt.Printf("%s  %s: %s\n", indent, label, guid)
-		return
-	}
-	fmt.Printf("%s  %s: %s\n", indent, label, info)
-	if info.Description != "" {
-		fmt.Printf("%s    Description: %s\n", indent, info.Description)
-	}
-	if len(info.AppliesTo) > 0 {
-		fmt.Printf("%s    Applies to: %s\n", indent, info.FormatAppliesTo())
-	}
-}
 
 func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver, indent string) {
 	if d.OldACE == nil || d.NewACE == nil {
@@ -266,10 +260,18 @@ func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolv
 	fmt.Printf("%s  Mask: 0x%08X -> 0x%08X\n", indent, d.OldACE.GetMask(), d.NewACE.GetMask())
 
 	if objGUID := d.NewACE.GetObjectTypeGUID(); objGUID != "" {
-		printGUIDInfo(objGUID, "ObjectType", guidResolver, indent)
+		if info, err := guidResolver.ResolveGUID(objGUID); err == nil {
+			fmt.Printf("%s  ObjectType: %s - %s\n", indent, info, info.Description)
+		} else {
+			fmt.Printf("%s  ObjectType: %s\n", indent, objGUID)
+		}
 	}
 	if inhGUID := d.NewACE.GetInheritedObjectTypeGUID(); inhGUID != "" {
-		printGUIDInfo(inhGUID, "InheritedObjectType", guidResolver, indent)
+		if info, err := guidResolver.ResolveGUID(inhGUID); err == nil {
+			fmt.Printf("%s  InheritedObjectType: %s - %s\n", indent, info, info.Description)
+		} else {
+			fmt.Printf("%s  InheritedObjectType: %s\n", indent, inhGUID)
+		}
 	}
 
 	if len(removed) > 0 {
