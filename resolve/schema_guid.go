@@ -18,7 +18,7 @@ type AppliesToEntry struct {
 // SchemaGUIDInfo contains metadata about a resolved schema GUID.
 type SchemaGUIDInfo struct {
 	Name        string
-	Type        string // extendedRight, propertySet, attribute, class, validatedWrite
+	Type        GUIDType
 	GUID        string
 	Description string
 	AppliesTo   []AppliesToEntry
@@ -109,12 +109,15 @@ func (WellKnownSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, er
 //   - RBCD Attacks: https://www.thehacker.recipes/ad/movement/kerberos/delegations/rbcd (The Hacker Recipes)
 //   - AD Certificate Services: https://posts.specterops.io/certified-pre-owned-d95910965cd2 (Will Schroeder & Lee Christensen)
 
+// GUIDType represents the category of a schema GUID.
+type GUIDType string
+
 const (
-	GUIDTypeExtendedRight  = "extendedRight"
-	GUIDTypePropertySet    = "propertySet"
-	GUIDTypeAttribute      = "attribute"
-	GUIDTypeClass          = "class"
-	GUIDTypeValidatedWrite = "validatedWrite"
+	GUIDTypeExtendedRight  GUIDType = "extendedRight"
+	GUIDTypePropertySet    GUIDType = "propertySet"
+	GUIDTypeAttribute      GUIDType = "attribute"
+	GUIDTypeClass          GUIDType = "class"
+	GUIDTypeValidatedWrite GUIDType = "validatedWrite"
 )
 
 var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{

@@ -226,7 +226,7 @@ func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info SchemaGUIDInfo) {
 	r.cache[guid] = info
 }
 
-func determineExtendedRightType(validAccesses string) string {
+func determineExtendedRightType(validAccesses string) GUIDType {
 	switch validAccesses {
 	case "256":
 		return GUIDTypeExtendedRight
