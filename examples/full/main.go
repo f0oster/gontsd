@@ -147,8 +147,8 @@ func dumpSecurityDescriptor(path string, resolver resolve.SIDResolver, guidResol
 	// Batch-resolve all SIDs upfront so individual lookups are cache hits.
 	resolve.ResolveBatchSIDs(resolver, sd.CollectSIDs())
 
-	fmt.Printf("\nOwner: %s\n", resolveSID(sd.OwnerSID, resolver))
-	fmt.Printf("Group: %s\n", resolveSID(sd.GroupSID, resolver))
+	fmt.Printf("\nOwner: %s\n", resolve.FormatSID(sd.OwnerSID, resolver))
+	fmt.Printf("Group: %s\n", resolve.FormatSID(sd.GroupSID, resolver))
 	fmt.Printf("Control: 0x%04X\n", sd.ControlFlags)
 
 	if sd.DACL != nil {
@@ -168,14 +168,14 @@ func printDiff(diff *gontsd.DiffResult, resolver resolve.SIDResolver, guidResolv
 
 	if diff.OwnerChanged {
 		fmt.Println("\nOwner Changed:")
-		fmt.Printf("  - Old: %s\n", resolveSID(diff.OldOwner, resolver))
-		fmt.Printf("  + New: %s\n", resolveSID(diff.NewOwner, resolver))
+		fmt.Printf("  - Old: %s\n", resolve.FormatSID(diff.OldOwner, resolver))
+		fmt.Printf("  + New: %s\n", resolve.FormatSID(diff.NewOwner, resolver))
 	}
 
 	if diff.GroupChanged {
 		fmt.Println("\nGroup Changed:")
-		fmt.Printf("  - Old: %s\n", resolveSID(diff.OldGroup, resolver))
-		fmt.Printf("  + New: %s\n", resolveSID(diff.NewGroup, resolver))
+		fmt.Printf("  - Old: %s\n", resolve.FormatSID(diff.OldGroup, resolver))
+		fmt.Printf("  + New: %s\n", resolve.FormatSID(diff.NewGroup, resolver))
 	}
 
 	if diff.ControlFlagsChanged {
@@ -224,7 +224,7 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	}
 
 	fmt.Printf("%s%sACE:\n", indent, ace.Type())
-	fmt.Printf("%s  SID:   %s\n", indent, resolveSID(ace.GetSID(), resolver))
+	fmt.Printf("%s  SID:   %s\n", indent, resolve.FormatSID(ace.GetSID(), resolver))
 	fmt.Printf("%s  Mask:  0x%08X\n", indent, ace.GetMask())
 	fmt.Printf("%s  Rights: %v\n", indent, ace.GetAccessRights())
 	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
@@ -238,18 +238,6 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	if appData := ace.GetApplicationData(); len(appData) > 0 {
 		fmt.Printf("%s  Condition: %d bytes\n", indent, len(appData))
 	}
-}
-
-func resolveSID(sid *gontsd.SID, resolver resolve.SIDResolver) string {
-	if sid == nil {
-		return "<nil>"
-	}
-
-	name, err := resolver.Resolve(sid)
-	if err != nil {
-		return fmt.Sprintf("%s (unresolved)", sid.Parsed)
-	}
-	return fmt.Sprintf("%s (%s)", sid.Parsed, name)
 }
 
 func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver, indent string) string {
@@ -294,7 +282,7 @@ func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolv
 	added, removed, unchanged := d.CompareAccessRights()
 
 	fmt.Printf("%s%sACE:\n", indent, d.NewACE.Type())
-	fmt.Printf("%s  SID:  %s\n", indent, resolveSID(d.NewACE.GetSID(), resolver))
+	fmt.Printf("%s  SID:  %s\n", indent, resolve.FormatSID(d.NewACE.GetSID(), resolver))
 	fmt.Printf("%s  Mask: 0x%08X -> 0x%08X\n", indent, d.OldACE.GetMask(), d.NewACE.GetMask())
 
 	if objGUID := d.NewACE.GetObjectTypeGUID(); objGUID != "" {

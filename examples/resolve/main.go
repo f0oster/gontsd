@@ -81,14 +81,14 @@ func main() {
 	resolve.ResolveBatchSIDs(sidResolver, sd.CollectSIDs())
 
 	// Print resolved output
-	fmt.Printf("Owner: %s\n", resolveSID(sd.OwnerSID, sidResolver))
-	fmt.Printf("Group: %s\n", resolveSID(sd.GroupSID, sidResolver))
+	fmt.Printf("Owner: %s\n", resolve.FormatSID(sd.OwnerSID, sidResolver))
+	fmt.Printf("Group: %s\n", resolve.FormatSID(sd.GroupSID, sidResolver))
 
 	if sd.DACL != nil {
 		fmt.Printf("\nDACL (%d ACEs):\n", len(sd.DACL.ACEs))
 		for i, ace := range sd.DACL.ACEs {
 			fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
-			fmt.Printf("      SID:    %s\n", resolveSID(ace.GetSID(), sidResolver))
+			fmt.Printf("      SID:    %s\n", resolve.FormatSID(ace.GetSID(), sidResolver))
 			fmt.Printf("      Rights: %v\n", ace.GetAccessRights())
 			if guid := ace.GetObjectTypeGUID(); guid != "" {
 				fmt.Printf("      ObjectType: %s\n", resolveGUID(guid, guidResolver))
@@ -98,17 +98,6 @@ func main() {
 			}
 		}
 	}
-}
-
-func resolveSID(sid *gontsd.SID, resolver resolve.SIDResolver) string {
-	if sid == nil {
-		return "<nil>"
-	}
-	name, err := resolver.Resolve(sid)
-	if err != nil {
-		return sid.Parsed
-	}
-	return fmt.Sprintf("%s (%s)", sid.Parsed, name)
 }
 
 func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver) string {
