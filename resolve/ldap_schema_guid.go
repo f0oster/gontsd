@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/f0oster/gontsd"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -83,7 +84,7 @@ func (r *LDAPSchemaGUIDResolver) preloadSchema() error {
 			continue
 		}
 
-		guidStr, err := guidBytesToString(rawGUID)
+		guidStr, err := gontsd.GUIDBytesToString(rawGUID)
 		if err != nil {
 			continue
 		}
@@ -236,20 +237,6 @@ func determineExtendedRightType(validAccesses string) string {
 	default:
 		return GUIDTypeExtendedRight
 	}
-}
-
-// guidBytesToString converts a 16-byte binary GUID to its string representation.
-// The first three groups are little-endian, the last two are big-endian.
-func guidBytesToString(b []byte) (string, error) {
-	if len(b) != 16 {
-		return "", fmt.Errorf("want 16 bytes, got %d", len(b))
-	}
-	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		b[3], b[2], b[1], b[0],
-		b[5], b[4],
-		b[7], b[6],
-		b[8], b[9],
-		b[10], b[11], b[12], b[13], b[14], b[15]), nil
 }
 
 func guidStringToBinaryFilter(guid string) (string, error) {

@@ -14,7 +14,8 @@ func indent(s, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-func guidBytesToString(b []byte) (string, error) {
+// GUIDBytesToString converts a 16-byte mixed-endian GUID to its string representation.
+func GUIDBytesToString(b []byte) (string, error) {
 	if len(b) < 16 {
 		return "", fmt.Errorf("want 16 bytes, got %d", len(b))
 	}

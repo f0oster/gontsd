@@ -104,7 +104,7 @@ func (b *baseObjectACE) GetObjectTypeGUID() string {
 	if b.ObjectFlags&0x1 == 0 {
 		return ""
 	}
-	guid, err := guidBytesToString(b.ObjectType[:])
+	guid, err := GUIDBytesToString(b.ObjectType[:])
 	if err != nil {
 		return ""
 	}
@@ -115,7 +115,7 @@ func (b *baseObjectACE) GetInheritedObjectTypeGUID() string {
 	if b.ObjectFlags&0x2 == 0 {
 		return ""
 	}
-	guid, err := guidBytesToString(b.InheritedObjectType[:])
+	guid, err := GUIDBytesToString(b.InheritedObjectType[:])
 	if err != nil {
 		return ""
 	}
