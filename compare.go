@@ -179,85 +179,126 @@ func compareACL(old, new *ACL) *ACLDiff {
 }
 
 func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
-	var diffs []ACEDiff
+	m := newACEMatcher(oldACEs, newACEs)
+	m.matchUnchanged()
+	m.matchReordered()
+	m.matchModified()
+	return m.collectDiffs()
+}
 
-	oldByID := make(map[string][]indexedACE)
-	newByID := make(map[string][]indexedACE)
+type indexedACE struct {
+	index int
+	ace   ACE
+}
 
+// aceMatcher tracks the state of matching ACEs between two ACLs.
+type aceMatcher struct {
+	oldACEs    []ACE
+	newACEs    []ACE
+	oldByID    map[string][]indexedACE
+	newByID    map[string][]indexedACE
+	matchedOld map[int]bool
+	matchedNew map[int]bool
+	diffs      []ACEDiff
+}
+
+func newACEMatcher(oldACEs, newACEs []ACE) *aceMatcher {
+	m := &aceMatcher{
+		oldACEs:    oldACEs,
+		newACEs:    newACEs,
+		oldByID:    make(map[string][]indexedACE),
+		newByID:    make(map[string][]indexedACE),
+		matchedOld: make(map[int]bool),
+		matchedNew: make(map[int]bool),
+	}
 	for i, ace := range oldACEs {
 		id := aceIdentity(ace)
-		oldByID[id] = append(oldByID[id], indexedACE{index: i, ace: ace})
+		m.oldByID[id] = append(m.oldByID[id], indexedACE{index: i, ace: ace})
 	}
 	for i, ace := range newACEs {
 		id := aceIdentity(ace)
-		newByID[id] = append(newByID[id], indexedACE{index: i, ace: ace})
+		m.newByID[id] = append(m.newByID[id], indexedACE{index: i, ace: ace})
 	}
+	return m
+}
 
-	matchedOld := make(map[int]bool)
-	matchedNew := make(map[int]bool)
-
-	for i := 0; i < len(oldACEs) && i < len(newACEs); i++ {
-		if aceEqual(oldACEs[i], newACEs[i]) {
-			matchedOld[i] = true
-			matchedNew[i] = true
+// matchUnchanged pairs ACEs that are identical and at the same position.
+func (m *aceMatcher) matchUnchanged() {
+	for i := 0; i < len(m.oldACEs) && i < len(m.newACEs); i++ {
+		if aceEqual(m.oldACEs[i], m.newACEs[i]) {
+			m.matchedOld[i] = true
+			m.matchedNew[i] = true
 		}
 	}
+}
 
-	for id, oldItems := range oldByID {
-		if newItems, exists := newByID[id]; exists {
-			for _, oldItem := range oldItems {
-				if matchedOld[oldItem.index] {
+// matchReordered pairs ACEs that are identical but at different positions.
+func (m *aceMatcher) matchReordered() {
+	for id, oldItems := range m.oldByID {
+		newItems, exists := m.newByID[id]
+		if !exists {
+			continue
+		}
+		for _, oldItem := range oldItems {
+			if m.matchedOld[oldItem.index] {
+				continue
+			}
+			for _, newItem := range newItems {
+				if m.matchedNew[newItem.index] {
 					continue
 				}
-				for _, newItem := range newItems {
-					if matchedNew[newItem.index] {
-						continue
-					}
-					if aceEqual(oldItem.ace, newItem.ace) {
-						// Found same ACE at different position
-						diffs = append(diffs, ACEDiff{
-							Type:        DiffReordered,
-							OldPosition: oldItem.index,
-							NewPosition: newItem.index,
-							OldACE:      oldItem.ace,
-							NewACE:      newItem.ace,
-						})
-						matchedOld[oldItem.index] = true
-						matchedNew[newItem.index] = true
-						break
-					}
+				if aceEqual(oldItem.ace, newItem.ace) {
+					m.diffs = append(m.diffs, ACEDiff{
+						Type:        DiffReordered,
+						OldPosition: oldItem.index,
+						NewPosition: newItem.index,
+						OldACE:      oldItem.ace,
+						NewACE:      newItem.ace,
+					})
+					m.matchedOld[oldItem.index] = true
+					m.matchedNew[newItem.index] = true
+					break
 				}
 			}
 		}
 	}
+}
 
-	for i, oldACE := range oldACEs {
-		if matchedOld[i] {
+// matchModified pairs ACEs that share an identity but have different content.
+func (m *aceMatcher) matchModified() {
+	for i, oldACE := range m.oldACEs {
+		if m.matchedOld[i] {
 			continue
 		}
 		oldID := aceIdentity(oldACE)
-		if newItems, exists := newByID[oldID]; exists {
-			for _, newItem := range newItems {
-				if matchedNew[newItem.index] {
-					continue
-				}
-				diffs = append(diffs, ACEDiff{
-					Type:        DiffModified,
-					OldPosition: i,
-					NewPosition: newItem.index,
-					OldACE:      oldACE,
-					NewACE:      newItem.ace,
-				})
-				matchedOld[i] = true
-				matchedNew[newItem.index] = true
-				break
+		newItems, exists := m.newByID[oldID]
+		if !exists {
+			continue
+		}
+		for _, newItem := range newItems {
+			if m.matchedNew[newItem.index] {
+				continue
 			}
+			m.diffs = append(m.diffs, ACEDiff{
+				Type:        DiffModified,
+				OldPosition: i,
+				NewPosition: newItem.index,
+				OldACE:      oldACE,
+				NewACE:      newItem.ace,
+			})
+			m.matchedOld[i] = true
+			m.matchedNew[newItem.index] = true
+			break
 		}
 	}
+}
 
-	for i, ace := range oldACEs {
-		if !matchedOld[i] {
-			diffs = append(diffs, ACEDiff{
+// collectDiffs appends removed and added entries for any unmatched ACEs,
+// then returns all collected diffs.
+func (m *aceMatcher) collectDiffs() []ACEDiff {
+	for i, ace := range m.oldACEs {
+		if !m.matchedOld[i] {
+			m.diffs = append(m.diffs, ACEDiff{
 				Type:        DiffRemoved,
 				OldPosition: i,
 				NewPosition: -1,
@@ -265,10 +306,9 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 			})
 		}
 	}
-
-	for i, ace := range newACEs {
-		if !matchedNew[i] {
-			diffs = append(diffs, ACEDiff{
+	for i, ace := range m.newACEs {
+		if !m.matchedNew[i] {
+			m.diffs = append(m.diffs, ACEDiff{
 				Type:        DiffAdded,
 				OldPosition: -1,
 				NewPosition: i,
@@ -276,13 +316,7 @@ func compareACEs(oldACEs, newACEs []ACE) []ACEDiff {
 			})
 		}
 	}
-
-	return diffs
-}
-
-type indexedACE struct {
-	index int
-	ace   ACE
+	return m.diffs
 }
 
 func aceIdentity(ace ACE) string {
