@@ -27,8 +27,8 @@ func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, err
 		cache:  make(map[string]SchemaGUIDInfo),
 	}
 
-	if err := r.preloadSchemaClasses(); err != nil {
-		return nil, fmt.Errorf("failed to preload schema classes: %w", err)
+	if err := r.preloadSchema(); err != nil {
+		return nil, fmt.Errorf("failed to preload schema: %w", err)
 	}
 
 	if err := r.preloadExtendedRights(); err != nil {
@@ -56,7 +56,7 @@ func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, erro
 	return &info, nil
 }
 
-func (r *LDAPSchemaGUIDResolver) preloadSchemaClasses() error {
+func (r *LDAPSchemaGUIDResolver) preloadSchema() error {
 	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
 
 	searchRequest := ldap.NewSearchRequest(
@@ -64,14 +64,14 @@ func (r *LDAPSchemaGUIDResolver) preloadSchemaClasses() error {
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
 		0, 0, false,
-		"(objectClass=classSchema)",
-		[]string{"schemaIDGUID", "ldapDisplayName", "cn"},
+		"(|(objectClass=classSchema)(objectClass=attributeSchema))",
+		[]string{"schemaIDGUID", "ldapDisplayName", "cn", "objectClass"},
 		nil,
 	)
 
 	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
-		return fmt.Errorf("LDAP search for schema classes failed: %w", err)
+		return fmt.Errorf("LDAP schema search failed: %w", err)
 	}
 
 	r.mu.Lock()
@@ -94,9 +94,17 @@ func (r *LDAPSchemaGUIDResolver) preloadSchemaClasses() error {
 			name = entry.GetAttributeValue("cn")
 		}
 
+		guidType := GUIDTypeAttribute
+		for _, oc := range entry.GetAttributeValues("objectClass") {
+			if oc == "classSchema" {
+				guidType = GUIDTypeClass
+				break
+			}
+		}
+
 		r.cache[normalizedGUID] = SchemaGUIDInfo{
 			Name: name,
-			Type: GUIDTypeClass,
+			Type: guidType,
 			GUID: normalizedGUID,
 		}
 	}
