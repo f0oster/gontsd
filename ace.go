@@ -5,37 +5,68 @@ import (
 	"fmt"
 )
 
+// ACEType represents the type byte of an Access Control Entry.
+// See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
+type ACEType uint8
+
 const (
-	ACCESS_ALLOWED_ACE_TYPE                 = 0x00
-	ACCESS_DENIED_ACE_TYPE                  = 0x01
-	SYSTEM_AUDIT_ACE_TYPE                   = 0x02
-	ACCESS_ALLOWED_OBJECT_ACE_TYPE          = 0x05
-	ACCESS_DENIED_OBJECT_ACE_TYPE           = 0x06
-	SYSTEM_AUDIT_OBJECT_ACE_TYPE            = 0x07
-	ACCESS_ALLOWED_CALLBACK_ACE_TYPE        = 0x09
-	ACCESS_DENIED_CALLBACK_ACE_TYPE         = 0x0A
-	ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE = 0x0B
-	ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE  = 0x0C
+	AccessAllowedACEType         ACEType = 0x00
+	AccessDeniedACEType          ACEType = 0x01
+	SystemAuditACEType           ACEType = 0x02
+	AccessAllowedObjectACEType   ACEType = 0x05
+	AccessDeniedObjectACEType    ACEType = 0x06
+	SystemAuditObjectACEType     ACEType = 0x07
+	AccessAllowedCallbackACEType ACEType = 0x09
+	AccessDeniedCallbackACEType  ACEType = 0x0A
+	AccessAllowedCallbackObjType ACEType = 0x0B
+	AccessDeniedCallbackObjType  ACEType = 0x0C
 )
+
+func (t ACEType) String() string {
+	switch t {
+	case AccessAllowedACEType:
+		return "AccessAllowed"
+	case AccessDeniedACEType:
+		return "AccessDenied"
+	case SystemAuditACEType:
+		return "SystemAudit"
+	case AccessAllowedObjectACEType:
+		return "AccessAllowedObject"
+	case AccessDeniedObjectACEType:
+		return "AccessDeniedObject"
+	case SystemAuditObjectACEType:
+		return "SystemAuditObject"
+	case AccessAllowedCallbackACEType:
+		return "AccessAllowedCallback"
+	case AccessDeniedCallbackACEType:
+		return "AccessDeniedCallback"
+	case AccessAllowedCallbackObjType:
+		return "AccessAllowedCallbackObject"
+	case AccessDeniedCallbackObjType:
+		return "AccessDeniedCallbackObject"
+	default:
+		return fmt.Sprintf("Unknown(0x%02X)", uint8(t))
+	}
+}
 
 // ACEHeader is the common header for all ACE types.
 // See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
 type ACEHeader struct {
-	AceType  uint8
+	AceType  ACEType
 	AceFlags uint8
 	AceSize  uint16
 }
 
 // ACE is the interface implemented by all Access Control Entry types.
 type ACE interface {
-	Type() uint8
+	Type() ACEType
 	Size() uint16
 	String() string
 	GetSID() *SID
 	GetMask() uint32
 	GetFlags() []string
-	GetObjectTypeGUID() string          // empty string for non-object ACEs
-	GetInheritedObjectTypeGUID() string // empty string for non-object ACEs
+	GetObjectTypeGUID() string
+	GetInheritedObjectTypeGUID() string
 }
 
 type baseACE struct {
@@ -45,7 +76,7 @@ type baseACE struct {
 	Flags  []string
 }
 
-func (b *baseACE) Type() uint8                        { return b.Header.AceType }
+func (b *baseACE) Type() ACEType                      { return b.Header.AceType }
 func (b *baseACE) Size() uint16                       { return b.Header.AceSize }
 func (b *baseACE) GetSID() *SID                       { return b.SID }
 func (b *baseACE) GetMask() uint32                    { return b.Mask }
@@ -63,7 +94,7 @@ type baseObjectACE struct {
 	FlagStrings         []string
 }
 
-func (b *baseObjectACE) Type() uint8        { return b.Header.AceType }
+func (b *baseObjectACE) Type() ACEType       { return b.Header.AceType }
 func (b *baseObjectACE) Size() uint16       { return b.Header.AceSize }
 func (b *baseObjectACE) GetSID() *SID       { return b.SID }
 func (b *baseObjectACE) GetMask() uint32    { return b.Mask }
@@ -211,7 +242,7 @@ type RawACE struct {
 	RawData []byte
 }
 
-func (a *RawACE) Type() uint8                        { return a.Header.AceType }
+func (a *RawACE) Type() ACEType                      { return a.Header.AceType }
 func (a *RawACE) Size() uint16                       { return a.Header.AceSize }
 func (a *RawACE) GetSID() *SID                       { return nil }
 func (a *RawACE) GetMask() uint32                    { return 0 }
@@ -228,50 +259,50 @@ func parseACE(data []byte) (ACE, int, error) {
 		return nil, 0, fmt.Errorf("data too short for ACE header")
 	}
 
-	switch data[0] {
-	case ACCESS_ALLOWED_ACE_TYPE:
+	switch ACEType(data[0]) {
+	case AccessAllowedACEType:
 		a, err := parseAccessAllowedACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_DENIED_ACE_TYPE:
+	case AccessDeniedACEType:
 		a, err := parseAccessDeniedACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_ALLOWED_OBJECT_ACE_TYPE:
+	case AccessAllowedObjectACEType:
 		a, err := parseAccessAllowedObjectACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_DENIED_OBJECT_ACE_TYPE:
+	case AccessDeniedObjectACEType:
 		a, err := parseAccessDeniedObjectACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_ALLOWED_CALLBACK_ACE_TYPE:
+	case AccessAllowedCallbackACEType:
 		a, err := parseAccessAllowedCallbackACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_DENIED_CALLBACK_ACE_TYPE:
+	case AccessDeniedCallbackACEType:
 		a, err := parseAccessDeniedCallbackACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE:
+	case AccessAllowedCallbackObjType:
 		a, err := parseAccessAllowedCallbackObjectACE(data)
 		if err != nil {
 			return nil, 0, err
 		}
 		return a, int(a.Size()), nil
-	case ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE:
+	case AccessDeniedCallbackObjType:
 		a, err := parseAccessDeniedCallbackObjectACE(data)
 		if err != nil {
 			return nil, 0, err
@@ -298,7 +329,7 @@ func parseACEHeader(data []byte) (ACEHeader, error) {
 		return ACEHeader{}, fmt.Errorf("data too short for ACE header")
 	}
 	return ACEHeader{
-		AceType:  data[0],
+		AceType:  ACEType(data[0]),
 		AceFlags: data[1],
 		AceSize:  binary.LittleEndian.Uint16(data[2:4]),
 	}, nil

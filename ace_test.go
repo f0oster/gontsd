@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func buildSimpleACE(aceType uint8, aceFlags uint8, mask uint32, sid []byte) []byte {
+func buildSimpleACE(aceType ACEType, aceFlags uint8, mask uint32, sid []byte) []byte {
 	aceSize := uint16(4 + 4 + len(sid)) // header + mask + SID
 	buf := make([]byte, aceSize)
-	buf[0] = aceType
+	buf[0] = uint8(aceType)
 	buf[1] = aceFlags
 	binary.LittleEndian.PutUint16(buf[2:4], aceSize)
 	binary.LittleEndian.PutUint32(buf[4:8], mask)
@@ -18,7 +18,7 @@ func buildSimpleACE(aceType uint8, aceFlags uint8, mask uint32, sid []byte) []by
 
 func TestParseACE_AccessAllowed(t *testing.T) {
 	sid := buildSIDBinary(1, 5, 18) // S-1-5-18
-	data := buildSimpleACE(ACCESS_ALLOWED_ACE_TYPE, 0x00, 0x001F01FF, sid)
+	data := buildSimpleACE(AccessAllowedACEType, 0x00, 0x001F01FF, sid)
 
 	ace, aceLen, err := parseACE(data)
 	if err != nil {
@@ -27,8 +27,8 @@ func TestParseACE_AccessAllowed(t *testing.T) {
 	if aceLen != len(data) {
 		t.Errorf("aceLen = %d, want %d", aceLen, len(data))
 	}
-	if ace.Type() != ACCESS_ALLOWED_ACE_TYPE {
-		t.Errorf("Type() = 0x%02X, want 0x%02X", ace.Type(), ACCESS_ALLOWED_ACE_TYPE)
+	if ace.Type() != AccessAllowedACEType {
+		t.Errorf("Type() = 0x%02X, want 0x%02X", ace.Type(), AccessAllowedACEType)
 	}
 	if ace.GetMask() != 0x001F01FF {
 		t.Errorf("GetMask() = 0x%08X, want 0x001F01FF", ace.GetMask())
@@ -43,14 +43,14 @@ func TestParseACE_AccessAllowed(t *testing.T) {
 
 func TestParseACE_AccessDenied(t *testing.T) {
 	sid := buildSIDBinary(1, 1, 0) // S-1-1-0
-	data := buildSimpleACE(ACCESS_DENIED_ACE_TYPE, 0x00, 0x00000002, sid)
+	data := buildSimpleACE(AccessDeniedACEType, 0x00, 0x00000002, sid)
 
 	ace, _, err := parseACE(data)
 	if err != nil {
 		t.Fatalf("parseACE() error: %v", err)
 	}
-	if ace.Type() != ACCESS_DENIED_ACE_TYPE {
-		t.Errorf("Type() = 0x%02X, want 0x%02X", ace.Type(), ACCESS_DENIED_ACE_TYPE)
+	if ace.Type() != AccessDeniedACEType {
+		t.Errorf("Type() = 0x%02X, want 0x%02X", ace.Type(), AccessDeniedACEType)
 	}
 	if _, ok := ace.(*AccessDeniedACE); !ok {
 		t.Errorf("expected *AccessDeniedACE, got %T", ace)
@@ -59,7 +59,7 @@ func TestParseACE_AccessDenied(t *testing.T) {
 
 func TestParseACE_UnsupportedType(t *testing.T) {
 	sid := buildSIDBinary(1, 5, 18)
-	data := buildSimpleACE(0xFF, 0x00, 0x00000000, sid)
+	data := buildSimpleACE(ACEType(0xFF), 0x00, 0x00000000, sid)
 
 	ace, aceLen, err := parseACE(data)
 	if err != nil {
@@ -89,7 +89,7 @@ func TestParseACE_TooShort(t *testing.T) {
 
 func TestACE_NonObjectGUIDs(t *testing.T) {
 	sid := buildSIDBinary(1, 5, 18)
-	data := buildSimpleACE(ACCESS_ALLOWED_ACE_TYPE, 0x00, 0x001F01FF, sid)
+	data := buildSimpleACE(AccessAllowedACEType, 0x00, 0x001F01FF, sid)
 
 	ace, _, err := parseACE(data)
 	if err != nil {
@@ -105,7 +105,7 @@ func TestACE_NonObjectGUIDs(t *testing.T) {
 
 func TestACE_String(t *testing.T) {
 	sid := buildSIDBinary(1, 5, 18)
-	data := buildSimpleACE(ACCESS_ALLOWED_ACE_TYPE, 0x00, 0x001F01FF, sid)
+	data := buildSimpleACE(AccessAllowedACEType, 0x00, 0x001F01FF, sid)
 
 	ace, _, err := parseACE(data)
 	if err != nil {

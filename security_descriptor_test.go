@@ -132,12 +132,12 @@ func TestParse_RootDomain(t *testing.T) {
 		t.Errorf("DACL ACE count = %d, want 58", len(sd.DACL.ACEs))
 	}
 	// First ACE is a deny ACE
-	if sd.DACL.ACEs[0].Type() != ACCESS_DENIED_ACE_TYPE {
-		t.Errorf("ACE[0] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[0].Type(), ACCESS_DENIED_ACE_TYPE)
+	if sd.DACL.ACEs[0].Type() != AccessDeniedACEType {
+		t.Errorf("ACE[0] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[0].Type(), AccessDeniedACEType)
 	}
 	// Verify mix of ACE types: simple and object
-	if sd.DACL.ACEs[11].Type() != ACCESS_ALLOWED_OBJECT_ACE_TYPE {
-		t.Errorf("ACE[11] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[11].Type(), ACCESS_ALLOWED_OBJECT_ACE_TYPE)
+	if sd.DACL.ACEs[11].Type() != AccessAllowedObjectACEType {
+		t.Errorf("ACE[11] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[11].Type(), AccessAllowedObjectACEType)
 	}
 }
 
