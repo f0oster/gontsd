@@ -16,37 +16,36 @@ if err != nil {
     log.Fatal(err)
 }
 
-fmt.Println(sd.OwnerSID.Parsed)   // "S-1-5-32-544"
-fmt.Println(sd.GroupSID.Parsed)   // "S-1-5-32-544"
+fmt.Println(sd.OwnerSID)   // "S-1-5-32-544"
+fmt.Println(sd.GroupSID)   // "S-1-5-32-544"
 
 // DACL and SACL are both parsed when present
 for _, ace := range sd.DACL.ACEs {
-    fmt.Printf("%s %s %v\n", ace.Type(), ace.GetSID().Parsed, ace.GetAccessRights())
+    fmt.Printf("%s %s %v\n", ace.Type(), ace.GetSID(), ace.GetAccessRights())
 }
 ```
 
 ## Comparing
 
-`Compare` detects changes to the owner, group, control flags, DACL, and SACL between two security descriptors. Changes can be compound — an ACE that is both modified and moved will have `DiffModified | DiffReordered` set.
-
 ```go
 diff := gontsd.Compare(oldSD, newSD)
 
 if diff.HasChanges() {
-    for _, d := range diff.DACLDiff.ACEDiffs {
-        if d.Type.Has(gontsd.DiffAdded) {
-            fmt.Printf("[+] %s\n", d.NewACE.GetSID().Parsed)
-        }
-        if d.Type.Has(gontsd.DiffRemoved) {
-            fmt.Printf("[-] %s\n", d.OldACE.GetSID().Parsed)
-        }
-        if d.Type.Has(gontsd.DiffModified) {
-            fmt.Printf("[~] %s mask 0x%X -> 0x%X\n",
-                d.NewACE.GetSID().Parsed, d.OldACE.GetMask(), d.NewACE.GetMask())
+    if diff.DACLDiff != nil {
+        for _, d := range diff.DACLDiff.ACEDiffs {
+            if d.Type.Has(gontsd.DiffAdded) {
+                fmt.Printf("[+] %s\n", d.NewACE.GetSID())
+            }
+            if d.Type.Has(gontsd.DiffModified) {
+                added, removed, _ := d.CompareAccessRights()
+                fmt.Printf("[~] %s +%v -%v\n", d.NewACE.GetSID(), added, removed)
+            }
         }
     }
 }
 ```
+
+`DiffType` is a bitmask — an ACE that is both modified and moved will have `DiffModified | DiffReordered` set.
 
 ## SID and GUID Resolution
 
@@ -54,18 +53,21 @@ The `resolve` package translates raw SIDs and schema GUIDs into human-readable n
 
 ### Without LDAP
 
-`WellKnownSIDResolver` resolves built-in Windows SIDs and well-known domain RIDs without a network connection:
+Resolve built-in Windows SIDs and well-known domain RIDs without a network connection:
 
 ```go
 resolver := resolve.WellKnownSIDResolver{}
-name, err := resolver.Resolve(sd.OwnerSID) // "BUILTIN\Administrators"
+name, err := resolver.Resolve(sid) // "BUILTIN\Administrators", "Domain Admins", etc.
+
+// Or use FormatSID for display strings:
+fmt.Println(resolve.FormatSID(sid, resolver)) // "S-1-5-32-544 (BUILTIN\Administrators)"
 ```
 
-`WellKnownSchemaGUIDResolver` resolves well-known schema classes, attributes, and extended rights:
+Resolve well-known schema GUIDs:
 
 ```go
 guidResolver := resolve.WellKnownSchemaGUIDResolver{}
-info, err := guidResolver.ResolveGUID(ace.GetObjectTypeGUID())
+info, err := guidResolver.ResolveGUID("1131f6ad-9c07-11d1-f79f-00c04fc2dcd2")
 fmt.Println(info.Name, info.Type) // "DS-Replication-Get-Changes-All" "extendedRight"
 ```
 
@@ -114,7 +116,7 @@ For security descriptors with many ACEs, resolve all SIDs in bulk to minimise LD
 resolve.ResolveBatchSIDs(sidResolver, sd.CollectSIDs())
 
 // Now individual calls are cache hits
-name, _ := sidResolver.Resolve(sd.OwnerSID)
+fmt.Println(resolve.FormatSID(sd.OwnerSID, sidResolver))
 ```
 
 ## Examples
