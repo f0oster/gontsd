@@ -70,7 +70,7 @@ func (r *LDAPSchemaGUIDResolver) preloadSchema() error {
 		nil,
 	)
 
-	sr, err := r.client.Conn().Search(searchRequest)
+	sr, err := r.client.Conn().SearchWithPaging(searchRequest, 1000)
 	if err != nil {
 		return fmt.Errorf("LDAP schema search failed: %w", err)
 	}
@@ -126,7 +126,7 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 		nil,
 	)
 
-	sr, err := r.client.Conn().Search(searchRequest)
+	sr, err := r.client.Conn().SearchWithPaging(searchRequest, 1000)
 	if err != nil {
 		return fmt.Errorf("LDAP search for extended rights failed: %w", err)
 	}
