@@ -43,12 +43,11 @@ func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, erro
 	r.mu.RUnlock()
 
 	info, err := r.querySchema(normalizedGUID)
-	if err == nil {
-		r.cacheGUID(normalizedGUID, info)
-		return &info, nil
+	if err != nil {
+		return nil, err
 	}
-
-	return nil, ErrSchemaGUIDNotFound
+	r.cacheGUID(normalizedGUID, info)
+	return &info, nil
 }
 
 func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
