@@ -296,7 +296,15 @@ func resolveGUIDWithDetails(guid string, resolver resolve.SchemaGUIDResolver, in
 		result.WriteString(fmt.Sprintf("\n%s  Description: %s", indent, info.Description))
 	}
 	if len(info.AppliesTo) > 0 {
-		result.WriteString(fmt.Sprintf("\n%s  Applies to: %s", indent, strings.Join(info.AppliesTo, ", ")))
+		names := make([]string, 0, len(info.AppliesTo))
+		for _, entry := range info.AppliesTo {
+			if entry.Name != "" {
+				names = append(names, entry.Name)
+			} else {
+				names = append(names, entry.GUID)
+			}
+		}
+		result.WriteString(fmt.Sprintf("\n%s  Applies to: %s", indent, strings.Join(names, ", ")))
 	}
 
 	return result.String()

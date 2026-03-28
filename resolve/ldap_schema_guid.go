@@ -19,10 +19,16 @@ type LDAPSchemaGUIDResolver struct {
 var _ SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 
 // NewLDAPSchemaGUIDResolver creates a new LDAP-backed schema GUID resolver.
+// It preloads schema classes and extended rights from AD so that subsequent
+// lookups can be resolved from cache.
 func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, error) {
 	r := &LDAPSchemaGUIDResolver{
 		client: client,
 		cache:  make(map[string]SchemaGUIDInfo),
+	}
+
+	if err := r.preloadSchemaClasses(); err != nil {
+		return nil, fmt.Errorf("failed to preload schema classes: %w", err)
 	}
 
 	if err := r.preloadExtendedRights(); err != nil {
@@ -48,6 +54,54 @@ func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, erro
 	}
 	r.cacheGUID(normalizedGUID, info)
 	return &info, nil
+}
+
+func (r *LDAPSchemaGUIDResolver) preloadSchemaClasses() error {
+	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
+
+	searchRequest := ldap.NewSearchRequest(
+		schemaDN,
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		"(objectClass=classSchema)",
+		[]string{"schemaIDGUID", "ldapDisplayName", "cn"},
+		nil,
+	)
+
+	sr, err := r.client.Conn().Search(searchRequest)
+	if err != nil {
+		return fmt.Errorf("LDAP search for schema classes failed: %w", err)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, entry := range sr.Entries {
+		rawGUID := entry.GetRawAttributeValue("schemaIDGUID")
+		if len(rawGUID) != 16 {
+			continue
+		}
+
+		guidStr, err := guidBytesToString(rawGUID)
+		if err != nil {
+			continue
+		}
+		normalizedGUID := NormalizeGUID(guidStr)
+
+		name := entry.GetAttributeValue("ldapDisplayName")
+		if name == "" {
+			name = entry.GetAttributeValue("cn")
+		}
+
+		r.cache[normalizedGUID] = SchemaGUIDInfo{
+			Name: name,
+			Type: GUIDTypeClass,
+			GUID: normalizedGUID,
+		}
+	}
+
+	return nil
 }
 
 func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
@@ -86,10 +140,14 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 		guidType := determineExtendedRightType(entry.GetAttributeValue("validAccesses"))
 
 		appliesToGUIDs := entry.GetAttributeValues("appliesTo")
-		var appliesTo []string
+		var appliesTo []AppliesToEntry
 		for _, classGUID := range appliesToGUIDs {
-			normalizedClassGUID := NormalizeGUID(classGUID)
-			appliesTo = append(appliesTo, normalizedClassGUID)
+			normalized := NormalizeGUID(classGUID)
+			ae := AppliesToEntry{GUID: normalized}
+			if cached, ok := r.cache[normalized]; ok {
+				ae.Name = cached.Name
+			}
+			appliesTo = append(appliesTo, ae)
 		}
 
 		r.cache[normalizedGUID] = SchemaGUIDInfo{
@@ -103,22 +161,6 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 	return nil
 }
 
-func (r *LDAPSchemaGUIDResolver) ResolveAppliesTo(info *SchemaGUIDInfo) []string {
-	if info == nil || len(info.AppliesTo) == 0 {
-		return nil
-	}
-
-	resolved := make([]string, 0, len(info.AppliesTo))
-	for _, classGUID := range info.AppliesTo {
-		classInfo, err := r.ResolveGUID(classGUID)
-		if err == nil && classInfo.Name != "" {
-			resolved = append(resolved, classInfo.Name)
-		} else {
-			resolved = append(resolved, classGUID)
-		}
-	}
-	return resolved
-}
 
 func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error) {
 	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
@@ -186,6 +228,20 @@ func determineExtendedRightType(validAccesses string) string {
 	default:
 		return GUIDTypeExtendedRight
 	}
+}
+
+// guidBytesToString converts a 16-byte binary GUID to its string representation.
+// The first three groups are little-endian, the last two are big-endian.
+func guidBytesToString(b []byte) (string, error) {
+	if len(b) != 16 {
+		return "", fmt.Errorf("want 16 bytes, got %d", len(b))
+	}
+	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+		b[3], b[2], b[1], b[0],
+		b[5], b[4],
+		b[7], b[6],
+		b[8], b[9],
+		b[10], b[11], b[12], b[13], b[14], b[15]), nil
 }
 
 func guidStringToBinaryFilter(guid string) (string, error) {

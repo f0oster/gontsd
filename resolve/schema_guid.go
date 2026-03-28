@@ -8,13 +8,19 @@ import (
 // ErrSchemaGUIDNotFound is returned when a GUID cannot be resolved.
 var ErrSchemaGUIDNotFound = errors.New("GUID not found")
 
+// AppliesToEntry represents a schema class that an extended right applies to.
+type AppliesToEntry struct {
+	GUID string
+	Name string
+}
+
 // SchemaGUIDInfo contains metadata about a resolved schema GUID.
 type SchemaGUIDInfo struct {
 	Name        string
 	Type        string // extendedRight, propertySet, attribute, class, validatedWrite
 	GUID        string
 	Description string
-	AppliesTo   []string
+	AppliesTo   []AppliesToEntry
 }
 
 // SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
@@ -97,7 +103,7 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "1131F6AA-9C07-11D1-F79F-00C04FC2DCD2",
 		Description: "Replicate directory changes from a naming context. Required for DCSync attacks.",
-		AppliesTo:   []string{"Domain-DNS", "Configuration", "DMD"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "3FDF05A1-9DCD-11D1-A9C5-0000F80367C1", Name: "Configuration"}, {GUID: "BF967A91-0DE6-11D0-A285-00AA003049E2", Name: "DMD"}},
 	},
 	// Ref: https://learn.microsoft.com/en-us/windows/win32/adschema/r-ds-replication-get-changes-all
 	"1131F6AD-9C07-11D1-F79F-00C04FC2DCD2": {
@@ -105,28 +111,28 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "1131F6AD-9C07-11D1-F79F-00C04FC2DCD2",
 		Description: "Replicate all directory changes including secrets (passwords). Critical for DCSync.",
-		AppliesTo:   []string{"Domain-DNS", "Configuration", "DMD"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "3FDF05A1-9DCD-11D1-A9C5-0000F80367C1", Name: "Configuration"}, {GUID: "BF967A91-0DE6-11D0-A285-00AA003049E2", Name: "DMD"}},
 	},
 	"89E95B76-444D-4C62-991A-0FACBEDA640C": {
 		Name:        "DS-Replication-Get-Changes-In-Filtered-Set",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "89E95B76-444D-4C62-991A-0FACBEDA640C",
 		Description: "Replicate directory changes in a filtered set (Read-Only Domain Controllers).",
-		AppliesTo:   []string{"Domain-DNS", "Configuration", "DMD"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "3FDF05A1-9DCD-11D1-A9C5-0000F80367C1", Name: "Configuration"}, {GUID: "BF967A91-0DE6-11D0-A285-00AA003049E2", Name: "DMD"}},
 	},
 	"1131F6AB-9C07-11D1-F79F-00C04FC2DCD2": {
 		Name:        "DS-Replication-Manage-Topology",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "1131F6AB-9C07-11D1-F79F-00C04FC2DCD2",
 		Description: "Manage replication topology and trigger replication between domain controllers.",
-		AppliesTo:   []string{"Domain-DNS", "Configuration", "DMD"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "3FDF05A1-9DCD-11D1-A9C5-0000F80367C1", Name: "Configuration"}, {GUID: "BF967A91-0DE6-11D0-A285-00AA003049E2", Name: "DMD"}},
 	},
 	"1131F6AC-9C07-11D1-F79F-00C04FC2DCD2": {
 		Name:        "DS-Replication-Synchronize",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "1131F6AC-9C07-11D1-F79F-00C04FC2DCD2",
 		Description: "Synchronize replication with a naming context.",
-		AppliesTo:   []string{"Domain-DNS", "Configuration", "DMD"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "3FDF05A1-9DCD-11D1-A9C5-0000F80367C1", Name: "Configuration"}, {GUID: "BF967A91-0DE6-11D0-A285-00AA003049E2", Name: "DMD"}},
 	},
 
 	// Password and credential-related rights
@@ -135,21 +141,21 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "00299570-246D-11D0-A768-00AA006E0529",
 		Description: "Reset a user's password without knowing the current password.",
-		AppliesTo:   []string{"User", "Computer", "ms-DS-Group-Managed-Service-Account"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}, {GUID: "CE206244-5827-4A86-BA1C-1C0C386C1B64", Name: "ms-DS-Group-Managed-Service-Account"}},
 	},
 	"AB721A53-1E2F-11D0-9819-00AA0040529B": {
 		Name:        "User-Change-Password",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "AB721A53-1E2F-11D0-9819-00AA0040529B",
 		Description: "Change own password (requires knowing current password).",
-		AppliesTo:   []string{"User", "Computer", "ms-DS-Group-Managed-Service-Account"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}, {GUID: "CE206244-5827-4A86-BA1C-1C0C386C1B64", Name: "ms-DS-Group-Managed-Service-Account"}},
 	},
 	"280F369C-67C7-438E-AE98-1D46F3C6F541": {
 		Name:        "Unexpire-Password",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "280F369C-67C7-438E-AE98-1D46F3C6F541",
 		Description: "Unexpire a user's password.",
-		AppliesTo:   []string{"Domain-DNS"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}},
 	},
 	"CCC2DC7D-A6AD-4A7A-8846-C04E3CC53501": {
 		Name:        "Unexpire-Password (Alt)",
@@ -164,14 +170,14 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "AB721A54-1E2F-11D0-9819-00AA0040529B",
 		Description: "Send email as another user. Allows impersonation in Exchange.",
-		AppliesTo:   []string{"User", "Computer"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}},
 	},
 	"AB721A56-1E2F-11D0-9819-00AA0040529B": {
 		Name:        "Receive-As",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "AB721A56-1E2F-11D0-9819-00AA0040529B",
 		Description: "Receive email as another user. Allows reading another user's mailbox.",
-		AppliesTo:   []string{"User", "Computer"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}},
 	},
 
 	// Certificate enrollment
@@ -181,14 +187,14 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "0E10C968-78FB-11D2-90D4-00C04F79DC55",
 		Description: "Enroll for certificates from a Certificate Authority. Can enable privilege escalation via ADCS.",
-		AppliesTo:   []string{"PKI-Certificate-Template"},
+		AppliesTo:   []AppliesToEntry{{GUID: "E0FA1E8C-9B45-11D0-AFDD-00C04FD930C9", Name: "PKI-Certificate-Template"}},
 	},
 	"A05B8CC2-17BC-4802-A710-E7C15AB866A2": {
 		Name:        "Certificate-AutoEnrollment",
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "A05B8CC2-17BC-4802-A710-E7C15AB866A2",
 		Description: "Automatically enroll for certificates from a Certificate Authority.",
-		AppliesTo:   []string{"PKI-Certificate-Template"},
+		AppliesTo:   []AppliesToEntry{{GUID: "E0FA1E8C-9B45-11D0-AFDD-00C04FD930C9", Name: "PKI-Certificate-Template"}},
 	},
 
 	// Domain operations
@@ -213,7 +219,7 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeExtendedRight,
 		GUID:        "BC0AC240-79A9-11D0-9020-00C04FC2D4CF",
 		Description: "Read group membership information.",
-		AppliesTo:   []string{"Group"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967A9C-0DE6-11D0-A285-00AA003049E2", Name: "Group"}},
 	},
 
 	// Validated Writes
@@ -222,7 +228,7 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeValidatedWrite,
 		GUID:        "72E39547-7B18-11D1-ADEF-00C04FD8D5CD",
 		Description: "Write DNS host name after validation. Validated to match computer account.",
-		AppliesTo:   []string{"Computer"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}},
 	},
 	// Security: https://attack.mitre.org/techniques/T1558/003/
 	"F3A64788-5306-11D1-A9C5-0000F80367C1": {
@@ -230,14 +236,14 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypeValidatedWrite,
 		GUID:        "F3A64788-5306-11D1-A9C5-0000F80367C1",
 		Description: "Write Service Principal Name after validation. Can enable Kerberoasting if misconfigured.",
-		AppliesTo:   []string{"Computer", "User", "ms-DS-Group-Managed-Service-Account"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}, {GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "CE206244-5827-4A86-BA1C-1C0C386C1B64", Name: "ms-DS-Group-Managed-Service-Account"}},
 	},
 	"BF9679C0-0DE6-11D0-A285-00AA003049E2": {
 		Name:        "Self-Membership",
 		Type:        GUIDTypeValidatedWrite,
 		GUID:        "BF9679C0-0DE6-11D0-A285-00AA003049E2",
 		Description: "Add/remove self from group membership. Allows users to add themselves to groups.",
-		AppliesTo:   []string{"Group"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967A9C-0DE6-11D0-A285-00AA003049E2", Name: "Group"}},
 	},
 
 	// Property Sets
@@ -246,14 +252,14 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypePropertySet,
 		GUID:        "C7407360-20BF-11D0-A768-00AA006E0529",
 		Description: "Read/write domain password policy attributes (minPwdAge, maxPwdAge, minPwdLength, etc.).",
-		AppliesTo:   []string{"Domain-DNS", "Sam-Domain"},
+		AppliesTo:   []AppliesToEntry{{GUID: "19195A5B-6DA0-11D0-AFA3-00C04FD930C9", Name: "Domain-DNS"}, {GUID: "19195A5A-6DA0-11D0-AFA3-00C04FD930C9", Name: "Sam-Domain"}},
 	},
 	"4C164200-20C0-11D0-A768-00AA006E0529": {
 		Name:        "User-Account-Restrictions",
 		Type:        GUIDTypePropertySet,
 		GUID:        "4C164200-20C0-11D0-A768-00AA006E0529",
 		Description: "Read/write user account restriction attributes (userAccountControl, accountExpires, etc.).",
-		AppliesTo:   []string{"User", "Computer"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}},
 	},
 	"59BA2F42-79A2-11D0-9020-00C04FC2D3CF": {
 		Name:        "General-Information",
@@ -266,7 +272,7 @@ var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 		Type:        GUIDTypePropertySet,
 		GUID:        "5F202010-79A5-11D0-9020-00C04FC2D4CF",
 		Description: "Read/write logon information attributes (logonHours, userWorkstations, etc.).",
-		AppliesTo:   []string{"User", "Computer"},
+		AppliesTo:   []AppliesToEntry{{GUID: "BF967ABA-0DE6-11D0-A285-00AA003049E2", Name: "User"}, {GUID: "BF967A86-0DE6-11D0-A285-00AA003049E2", Name: "Computer"}},
 	},
 	"E45795B2-9455-11D1-AEBD-0000F80367C1": {Name: "Email-Information", Type: GUIDTypePropertySet, GUID: "E45795B2-9455-11D1-AEBD-0000F80367C1"},
 	"E45795B3-9455-11D1-AEBD-0000F80367C1": {Name: "Web-Information", Type: GUIDTypePropertySet, GUID: "E45795B3-9455-11D1-AEBD-0000F80367C1"},
