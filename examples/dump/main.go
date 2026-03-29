@@ -57,27 +57,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	sd, err := gontsd.Parse(sdBytes, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to parse security descriptor: %v\n", err)
-		os.Exit(1)
-	}
-
 	r, err := ldapresolver.NewLDAPResolver(client)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to set up resolver: %v\n", err)
 		os.Exit(1)
 	}
 
-	gontsd.ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
+	sd, err := gontsd.Parse(sdBytes, &r.Resolver)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to parse security descriptor: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Printf("Object:  %s\n", targetDN)
-	fmt.Printf("Owner:   %s\n", gontsd.FormatSID(sd.OwnerSID, r.SIDs))
-	fmt.Printf("Group:   %s\n", gontsd.FormatSID(sd.GroupSID, r.SIDs))
+	fmt.Printf("Owner:   %s\n", sd.OwnerSID.Resolved())
+	fmt.Printf("Group:   %s\n", sd.GroupSID.Resolved())
 	fmt.Printf("Control: %s\n", sd.ControlFlags)
 
-	printACL("DACL", sd.DACL, r)
-	printACL("SACL", sd.SACL, r)
+	printACL("DACL", sd.DACL)
+	printACL("SACL", sd.SACL)
 }
 
 func fetchSecurityDescriptor(client *ldapresolver.LDAPClient, dn string) ([]byte, error) {
@@ -109,20 +107,20 @@ func fetchSecurityDescriptor(client *ldapresolver.LDAPClient, dn string) ([]byte
 	return sdBytes, nil
 }
 
-func printACL(name string, acl *gontsd.ACL, r *ldapresolver.LDAPResolver) {
+func printACL(name string, acl *gontsd.ACL) {
 	if acl == nil {
 		return
 	}
 	fmt.Printf("\n%s (%d ACEs):\n", name, len(acl.ACEs))
 	for i, ace := range acl.ACEs {
 		fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
-		fmt.Printf("      Trustee: %s\n", gontsd.FormatSID(ace.SID(), r.SIDs))
+		fmt.Printf("      Trustee: %s\n", ace.SID().Resolved())
 		fmt.Printf("      Mask:    %s\n", ace.Mask())
 		if guid := ace.ObjectTypeGUID(); guid != nil {
-			fmt.Printf("      ObjectType: %s\n", gontsd.FormatGUID(guid.Raw, r.GUIDs))
+			fmt.Printf("      ObjectType: %s\n", guid.Resolved())
 		}
 		if guid := ace.InheritedObjectTypeGUID(); guid != nil {
-			fmt.Printf("      InheritedObjectType: %s\n", gontsd.FormatGUID(guid.Raw, r.GUIDs))
+			fmt.Printf("      InheritedObjectType: %s\n", guid.Resolved())
 		}
 		if appData := ace.ApplicationData(); len(appData) > 0 {
 			fmt.Printf("      Condition: %d bytes\n", len(appData))
