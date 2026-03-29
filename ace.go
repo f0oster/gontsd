@@ -66,8 +66,8 @@ type ACE interface {
 	Mask() AccessMask
 	AceFlags() ACEFlags
 	ApplicationData() []byte
-	ObjectTypeGUID() string
-	InheritedObjectTypeGUID() string
+	ObjectTypeGUID() *GUID
+	InheritedObjectTypeGUID() *GUID
 }
 
 // aceBase contains the fields common to every ACE type.
@@ -83,8 +83,8 @@ func (b *aceBase) SID() *SID                       { return b.sid }
 func (b *aceBase) Mask() AccessMask                { return AccessMask(b.mask) }
 func (b *aceBase) AceFlags() ACEFlags              { return ACEFlags(b.Header.AceFlags) }
 func (b *aceBase) ApplicationData() []byte         { return nil }
-func (b *aceBase) ObjectTypeGUID() string          { return "" }
-func (b *aceBase) InheritedObjectTypeGUID() string { return "" }
+func (b *aceBase) ObjectTypeGUID() *GUID           { return nil }
+func (b *aceBase) InheritedObjectTypeGUID() *GUID  { return nil }
 
 // AccessAllowedACE grants access rights to a trustee.
 type AccessAllowedACE struct {
@@ -121,11 +121,11 @@ type SystemAuditObjectACE struct {
 	InheritedObjectType [16]byte
 }
 
-func (a *SystemAuditObjectACE) ObjectTypeGUID() string {
+func (a *SystemAuditObjectACE) ObjectTypeGUID() *GUID {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *SystemAuditObjectACE) InheritedObjectTypeGUID() string {
+func (a *SystemAuditObjectACE) InheritedObjectTypeGUID() *GUID {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
@@ -141,11 +141,11 @@ type AccessAllowedObjectACE struct {
 	InheritedObjectType [16]byte
 }
 
-func (a *AccessAllowedObjectACE) ObjectTypeGUID() string {
+func (a *AccessAllowedObjectACE) ObjectTypeGUID() *GUID {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessAllowedObjectACE) InheritedObjectTypeGUID() string {
+func (a *AccessAllowedObjectACE) InheritedObjectTypeGUID() *GUID {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
@@ -161,11 +161,11 @@ type AccessDeniedObjectACE struct {
 	InheritedObjectType [16]byte
 }
 
-func (a *AccessDeniedObjectACE) ObjectTypeGUID() string {
+func (a *AccessDeniedObjectACE) ObjectTypeGUID() *GUID {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessDeniedObjectACE) InheritedObjectTypeGUID() string {
+func (a *AccessDeniedObjectACE) InheritedObjectTypeGUID() *GUID {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
@@ -208,11 +208,11 @@ type AccessAllowedCallbackObjectACE struct {
 }
 
 func (a *AccessAllowedCallbackObjectACE) ApplicationData() []byte { return a.appData }
-func (a *AccessAllowedCallbackObjectACE) ObjectTypeGUID() string {
+func (a *AccessAllowedCallbackObjectACE) ObjectTypeGUID() *GUID {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessAllowedCallbackObjectACE) InheritedObjectTypeGUID() string {
+func (a *AccessAllowedCallbackObjectACE) InheritedObjectTypeGUID() *GUID {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
@@ -230,11 +230,11 @@ type AccessDeniedCallbackObjectACE struct {
 }
 
 func (a *AccessDeniedCallbackObjectACE) ApplicationData() []byte { return a.appData }
-func (a *AccessDeniedCallbackObjectACE) ObjectTypeGUID() string {
+func (a *AccessDeniedCallbackObjectACE) ObjectTypeGUID() *GUID {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessDeniedCallbackObjectACE) InheritedObjectTypeGUID() string {
+func (a *AccessDeniedCallbackObjectACE) InheritedObjectTypeGUID() *GUID {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
@@ -255,26 +255,26 @@ func (a *RawACE) String() string {
 
 // GUID helpers for object ACE types.
 
-func objectTypeGUID(flags uint32, objType [16]byte) string {
+func objectTypeGUID(flags uint32, objType [16]byte) *GUID {
 	if flags&0x1 == 0 {
-		return ""
+		return nil
 	}
 	guid, err := GUIDBytesToString(objType[:])
 	if err != nil {
-		return ""
+		return nil
 	}
-	return guid
+	return &GUID{Raw: guid}
 }
 
-func inheritedObjectTypeGUID(flags uint32, inhType [16]byte) string {
+func inheritedObjectTypeGUID(flags uint32, inhType [16]byte) *GUID {
 	if flags&0x2 == 0 {
-		return ""
+		return nil
 	}
 	guid, err := GUIDBytesToString(inhType[:])
 	if err != nil {
-		return ""
+		return nil
 	}
-	return guid
+	return &GUID{Raw: guid}
 }
 
 // Parsing functions.

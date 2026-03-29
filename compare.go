@@ -175,6 +175,16 @@ func Compare(old, new *SecurityDescriptor) *DiffResult {
 	return result
 }
 
+func guidEqual(a, b *GUID) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Raw == b.Raw
+}
+
 func sidEqual(a, b *SID) bool {
 	if a == nil && b == nil {
 		return true
@@ -393,8 +403,8 @@ func aceIdentity(ace ACE) string {
 	if sid != nil {
 		sidStr = sid.Parsed
 	}
-	if objGUID := ace.ObjectTypeGUID(); objGUID != "" {
-		return fmt.Sprintf("0x%02X:%s:%s", ace.Type(), sidStr, objGUID)
+	if objGUID := ace.ObjectTypeGUID(); objGUID != nil {
+		return fmt.Sprintf("0x%02X:%s:%s", ace.Type(), sidStr, objGUID.Raw)
 	}
 	return fmt.Sprintf("0x%02X:%s", ace.Type(), sidStr)
 }
@@ -418,10 +428,10 @@ func aceEqual(a, b ACE) bool {
 	if !sidEqual(a.SID(), b.SID()) {
 		return false
 	}
-	if a.ObjectTypeGUID() != b.ObjectTypeGUID() {
+	if !guidEqual(a.ObjectTypeGUID(), b.ObjectTypeGUID()) {
 		return false
 	}
-	if a.InheritedObjectTypeGUID() != b.InheritedObjectTypeGUID() {
+	if !guidEqual(a.InheritedObjectTypeGUID(), b.InheritedObjectTypeGUID()) {
 		return false
 	}
 	if !bytes.Equal(a.ApplicationData(), b.ApplicationData()) {

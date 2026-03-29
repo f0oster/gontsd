@@ -118,11 +118,11 @@ func printACL(name string, acl *gontsd.ACL, r *resolve.LDAPResolver) {
 		fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
 		fmt.Printf("      Trustee: %s\n", resolve.FormatSID(ace.SID(), r.SIDs))
 		fmt.Printf("      Mask:    %s\n", ace.Mask())
-		if guid := ace.ObjectTypeGUID(); guid != "" {
-			fmt.Printf("      ObjectType: %s\n", resolve.FormatGUID(guid, r.GUIDs))
+		if guid := ace.ObjectTypeGUID(); guid != nil {
+			fmt.Printf("      ObjectType: %s\n", resolve.FormatGUID(guid.Raw, r.GUIDs))
 		}
-		if guid := ace.InheritedObjectTypeGUID(); guid != "" {
-			fmt.Printf("      InheritedObjectType: %s\n", resolve.FormatGUID(guid, r.GUIDs))
+		if guid := ace.InheritedObjectTypeGUID(); guid != nil {
+			fmt.Printf("      InheritedObjectType: %s\n", resolve.FormatGUID(guid.Raw, r.GUIDs))
 		}
 		if appData := ace.ApplicationData(); len(appData) > 0 {
 			fmt.Printf("      Condition: %d bytes\n", len(appData))

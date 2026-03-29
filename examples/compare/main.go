@@ -179,11 +179,11 @@ func printACE(ace gontsd.ACE, r *resolve.Resolver, indent string) {
 	fmt.Printf("%s%sACE:\n", indent, ace.Type())
 	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(ace.SID(), r.SIDs))
 	fmt.Printf("%s  Mask:    %s\n", indent, ace.Mask())
-	if objGUID := ace.ObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID, r.GUIDs))
+	if objGUID := ace.ObjectTypeGUID(); objGUID != nil {
+		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID.Raw, r.GUIDs))
 	}
-	if inhGUID := ace.InheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID, r.GUIDs))
+	if inhGUID := ace.InheritedObjectTypeGUID(); inhGUID != nil {
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID.Raw, r.GUIDs))
 	}
 	if appData := ace.ApplicationData(); len(appData) > 0 {
 		fmt.Printf("%s  Condition: %d bytes\n", indent, len(appData))
@@ -203,11 +203,11 @@ func printModifiedACE(d gontsd.ACEDiff, r *resolve.Resolver, indent string) {
 	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(d.NewACE.SID(), r.SIDs))
 	fmt.Printf("%s  Mask:    %s -> %s\n", indent, d.OldACE.Mask(), d.NewACE.Mask())
 
-	if objGUID := d.NewACE.ObjectTypeGUID(); objGUID != "" {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID, r.GUIDs))
+	if objGUID := d.NewACE.ObjectTypeGUID(); objGUID != nil {
+		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID.Raw, r.GUIDs))
 	}
-	if inhGUID := d.NewACE.InheritedObjectTypeGUID(); inhGUID != "" {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID, r.GUIDs))
+	if inhGUID := d.NewACE.InheritedObjectTypeGUID(); inhGUID != nil {
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID.Raw, r.GUIDs))
 	}
 
 	if len(removed) > 0 {

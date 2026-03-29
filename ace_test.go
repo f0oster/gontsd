@@ -96,11 +96,11 @@ func TestACE_NonObjectGUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseACE() error: %v", err)
 	}
-	if g := ace.ObjectTypeGUID(); g != "" {
-		t.Errorf("GetObjectTypeGUID() = %q, want empty for non-object ACE", g)
+	if g := ace.ObjectTypeGUID(); g != nil {
+		t.Errorf("ObjectTypeGUID() = %v, want nil for non-object ACE", g)
 	}
-	if g := ace.InheritedObjectTypeGUID(); g != "" {
-		t.Errorf("GetInheritedObjectTypeGUID() = %q, want empty for non-object ACE", g)
+	if g := ace.InheritedObjectTypeGUID(); g != nil {
+		t.Errorf("InheritedObjectTypeGUID() = %v, want nil for non-object ACE", g)
 	}
 }
 
