@@ -19,24 +19,17 @@ func NewResolver() *Resolver {
 
 // LDAPResolver extends [Resolver] with Active Directory lookups,
 // chaining well-known tables with LDAP queries as a fallback.
-// The caller must call [LDAPResolver.Close] when done.
+// The caller owns the [LDAPClient] and is responsible for closing it.
 type LDAPResolver struct {
 	Resolver
-	client *LDAPClient
 }
 
 // NewLDAPResolver creates a resolver backed by both well-known tables
-// and LDAP queries. It connects to Active Directory and preloads the
-// schema, so construction may take a moment on large directories.
-func NewLDAPResolver(config LDAPConfig) (*LDAPResolver, error) {
-	client, err := NewLDAPClient(config)
-	if err != nil {
-		return nil, err
-	}
-
+// and LDAP queries. It preloads the schema from AD, so construction
+// may take a moment on large directories.
+func NewLDAPResolver(client *LDAPClient) (*LDAPResolver, error) {
 	ldapGUID, err := NewLDAPSchemaGUIDResolver(client)
 	if err != nil {
-		client.Close()
 		return nil, err
 	}
 
@@ -55,11 +48,5 @@ func NewLDAPResolver(config LDAPConfig) (*LDAPResolver, error) {
 				},
 			},
 		},
-		client: client,
 	}, nil
-}
-
-// Close closes the underlying LDAP connection.
-func (r *LDAPResolver) Close() error {
-	return r.client.Close()
 }

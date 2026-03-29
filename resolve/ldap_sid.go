@@ -183,19 +183,14 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]SIDR
 }
 
 func extractName(entry *ldap.Entry) string {
-	samName := entry.GetAttributeValue("sAMAccountName")
-	dn := entry.GetAttributeValue("distinguishedName")
-	if samName != "" && dn != "" {
-		return fmt.Sprintf("%s (%s)", samName, dn)
-	}
-	if samName != "" {
+	if samName := entry.GetAttributeValue("sAMAccountName"); samName != "" {
 		return samName
-	}
-	if dn != "" {
-		return dn
 	}
 	if name := entry.GetAttributeValue("name"); name != "" {
 		return name
+	}
+	if dn := entry.GetAttributeValue("distinguishedName"); dn != "" {
+		return dn
 	}
 	return ""
 }
