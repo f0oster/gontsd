@@ -223,7 +223,7 @@ func printACE(ace gontsd.ACE, resolver resolve.SIDResolver, guidResolver resolve
 	}
 
 	fmt.Printf("%s%sACE:\n", indent, ace.Type())
-	fmt.Printf("%s  SID:   %s\n", indent, resolve.FormatSID(ace.SID(), resolver))
+	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(ace.SID(), resolver))
 	fmt.Printf("%s  Mask:  %s\n", indent, ace.Mask())
 	if objGUID := ace.ObjectTypeGUID(); objGUID != "" {
 		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID, guidResolver))
@@ -247,7 +247,7 @@ func printModifiedACE(d gontsd.ACEDiff, resolver resolve.SIDResolver, guidResolv
 	added, removed, unchanged := d.CompareAccessRights()
 
 	fmt.Printf("%s%sACE:\n", indent, d.NewACE.Type())
-	fmt.Printf("%s  SID:  %s\n", indent, resolve.FormatSID(d.NewACE.SID(), resolver))
+	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(d.NewACE.SID(), resolver))
 	fmt.Printf("%s  Mask: %s -> %s\n", indent, d.OldACE.Mask(), d.NewACE.Mask())
 
 	if objGUID := d.NewACE.ObjectTypeGUID(); objGUID != "" {

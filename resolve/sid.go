@@ -253,7 +253,7 @@ func ResolveBatchSIDs(resolver SIDResolver, sids []*gontsd.SID) map[string]SIDRe
 }
 
 // FormatSID resolves a SID using the given resolver and returns a
-// display string like "S-1-5-18 (Local System)". If the SID cannot
+// display string like "Local System (S-1-5-18)". If the SID cannot
 // be resolved, it returns the raw SID string.
 func FormatSID(sid *gontsd.SID, resolver SIDResolver) string {
 	if sid == nil {
@@ -263,7 +263,7 @@ func FormatSID(sid *gontsd.SID, resolver SIDResolver) string {
 	if err != nil {
 		return sid.Parsed
 	}
-	return fmt.Sprintf("%s (%s)", sid.Parsed, name)
+	return fmt.Sprintf("%s (%s)", name, sid.Parsed)
 }
 
 func findBatchResolver(r SIDResolver) (BatchSIDResolver, bool) {
