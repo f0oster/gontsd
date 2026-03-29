@@ -13,20 +13,20 @@ func TestGuidBytesToString(t *testing.T) {
 		0x00, 0xC0, 0x4F, 0xC2, 0xDC, 0xD2, // 00C04FC2DCD2 (BE)
 	}
 
-	got, err := GUIDBytesToString(b)
+	got, err := guidBytesToString(b)
 	if err != nil {
-		t.Fatalf("GUIDBytesToString() error: %v", err)
+		t.Fatalf("guidBytesToString() error: %v", err)
 	}
 	want := "1131F6AD-9C07-11D1-F79F-00C04FC2DCD2"
 	if got != want {
-		t.Errorf("GUIDBytesToString() = %q, want %q", got, want)
+		t.Errorf("guidBytesToString() = %q, want %q", got, want)
 	}
 }
 
 func TestGuidBytesToString_TooShort(t *testing.T) {
-	_, err := GUIDBytesToString([]byte{0x01, 0x02, 0x03})
+	_, err := guidBytesToString([]byte{0x01, 0x02, 0x03})
 	if err == nil {
-		t.Error("GUIDBytesToString() expected error for short input, got nil")
+		t.Error("guidBytesToString() expected error for short input, got nil")
 	}
 }
 

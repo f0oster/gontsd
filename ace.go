@@ -206,7 +206,7 @@ func objectTypeGUID(flags uint32, objType [16]byte) *GUID {
 	if flags&0x1 == 0 {
 		return nil
 	}
-	guid, err := GUIDBytesToString(objType[:])
+	guid, err := guidBytesToString(objType[:])
 	if err != nil {
 		return nil
 	}
@@ -217,7 +217,7 @@ func inheritedObjectTypeGUID(flags uint32, inhType [16]byte) *GUID {
 	if flags&0x2 == 0 {
 		return nil
 	}
-	guid, err := GUIDBytesToString(inhType[:])
+	guid, err := guidBytesToString(inhType[:])
 	if err != nil {
 		return nil
 	}

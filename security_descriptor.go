@@ -145,7 +145,7 @@ func (sd *SecurityDescriptor) resolve(r *Resolver) {
 	}
 
 	// Batch-resolve all SIDs upfront
-	ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
+	resolveBatchSIDs(r.SIDs, sd.collectSIDs())
 }
 
 func resolveGUID(guid *GUID, resolver SchemaGUIDResolver) {
@@ -162,9 +162,9 @@ func resolveGUID(guid *GUID, resolver SchemaGUIDResolver) {
 	guid.Description = info.Description
 }
 
-// CollectSIDs returns all unique SIDs referenced by this security descriptor,
+// collectSIDs returns all unique SIDs referenced by this security descriptor,
 // including owner, group, and all ACE SIDs from the DACL and SACL.
-func (sd *SecurityDescriptor) CollectSIDs() []*SID {
+func (sd *SecurityDescriptor) collectSIDs() []*SID {
 	if sd == nil {
 		return nil
 	}

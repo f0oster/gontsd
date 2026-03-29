@@ -195,12 +195,12 @@ func TestCollectSIDs(t *testing.T) {
 		t.Fatalf("Parse() error: %v", err)
 	}
 
-	sids := sd.CollectSIDs()
+	sids := sd.collectSIDs()
 
 	// Owner + group + 4 ACE SIDs, but owner SID matches ACE[3] SID and
 	// group SID is unique, so expect 5 unique SIDs.
 	if len(sids) != 5 {
-		t.Errorf("CollectSIDs() returned %d SIDs, want 5", len(sids))
+		t.Errorf("collectSIDs() returned %d SIDs, want 5", len(sids))
 	}
 
 	// Check deduplication — no SID string should appear twice.
@@ -214,16 +214,16 @@ func TestCollectSIDs(t *testing.T) {
 
 	// Owner and group should be included.
 	if !seen[sd.OwnerSID.Value] {
-		t.Error("OwnerSID not in CollectSIDs result")
+		t.Error("OwnerSID not in collectSIDs result")
 	}
 	if !seen[sd.GroupSID.Value] {
-		t.Error("GroupSID not in CollectSIDs result")
+		t.Error("GroupSID not in collectSIDs result")
 	}
 }
 
 func TestCollectSIDs_Nil(t *testing.T) {
 	var sd *SecurityDescriptor
-	if sids := sd.CollectSIDs(); sids != nil {
-		t.Errorf("nil SD.CollectSIDs() = %v, want nil", sids)
+	if sids := sd.collectSIDs(); sids != nil {
+		t.Errorf("nil SD.collectSIDs() = %v, want nil", sids)
 	}
 }

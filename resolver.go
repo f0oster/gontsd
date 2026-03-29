@@ -10,8 +10,8 @@ type Resolver struct {
 // and schema GUID tables.
 func NewResolver() *Resolver {
 	return &Resolver{
-		SIDs:  WellKnownSIDResolver{},
-		GUIDs: WellKnownSchemaGUIDResolver{},
+		SIDs:  wellKnownSIDResolver{},
+		GUIDs: wellKnownSchemaGUIDResolver{},
 	}
 }
 
@@ -20,21 +20,21 @@ func NewResolver() *Resolver {
 // may take a moment on large directories.
 // The caller owns the [LDAPClient] and is responsible for closing it.
 func NewLDAPResolver(client *LDAPClient) (*Resolver, error) {
-	ldapGUID, err := NewLDAPSchemaGUIDResolver(client)
+	ldapGUID, err := newLDAPSchemaGUIDResolver(client)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Resolver{
-		SIDs: ChainSIDResolver{
+		SIDs: chainSIDResolver{
 			Resolvers: []SIDResolver{
-				WellKnownSIDResolver{},
-				NewLDAPSIDResolver(client),
+				wellKnownSIDResolver{},
+				newLDAPSIDResolver(client),
 			},
 		},
-		GUIDs: ChainSchemaGUIDResolver{
+		GUIDs: chainSchemaGUIDResolver{
 			Resolvers: []SchemaGUIDResolver{
-				WellKnownSchemaGUIDResolver{},
+				wellKnownSchemaGUIDResolver{},
 				ldapGUID,
 			},
 		},

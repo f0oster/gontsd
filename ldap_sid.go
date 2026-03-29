@@ -22,19 +22,19 @@ type LDAPConfig struct {
 
 const defaultMaxCacheSize = 10000
 
-// LDAPSIDResolver resolves SIDs by querying Active Directory.
-type LDAPSIDResolver struct {
+// ldapSIDResolver resolves SIDs by querying Active Directory.
+type ldapSIDResolver struct {
 	client       *LDAPClient
 	cache        map[string]string // SID string -> resolved name
 	mu           sync.RWMutex
 	maxCacheSize int
 }
 
-var _ SIDResolver = (*LDAPSIDResolver)(nil)
+var _ SIDResolver = (*ldapSIDResolver)(nil)
 
-// NewLDAPSIDResolver creates a new LDAP-backed SID resolver.
-func NewLDAPSIDResolver(client *LDAPClient, opts ...SIDResolverOption) *LDAPSIDResolver {
-	r := &LDAPSIDResolver{
+// newLDAPSIDResolver creates a new LDAP-backed SID resolver.
+func newLDAPSIDResolver(client *LDAPClient, opts ...sidResolverOption) *ldapSIDResolver {
+	r := &ldapSIDResolver{
 		client:       client,
 		cache:        make(map[string]string),
 		maxCacheSize: defaultMaxCacheSize,
@@ -45,18 +45,18 @@ func NewLDAPSIDResolver(client *LDAPClient, opts ...SIDResolverOption) *LDAPSIDR
 	return r
 }
 
-// SIDResolverOption configures an LDAPSIDResolver.
-type SIDResolverOption func(*LDAPSIDResolver)
+// sidResolverOption configures an ldapSIDResolver.
+type sidResolverOption func(*ldapSIDResolver)
 
-// WithMaxSIDCacheSize sets the maximum number of cached SID resolutions.
+// withMaxSIDCacheSize sets the maximum number of cached SID resolutions.
 // When exceeded, the cache is cleared. Default is 10,000.
-func WithMaxSIDCacheSize(n int) SIDResolverOption {
-	return func(r *LDAPSIDResolver) {
+func withMaxSIDCacheSize(n int) sidResolverOption {
+	return func(r *ldapSIDResolver) {
 		r.maxCacheSize = n
 	}
 }
 
-func (r *LDAPSIDResolver) Resolve(sid *SID) (string, error) {
+func (r *ldapSIDResolver) Resolve(sid *SID) (string, error) {
 	if sid == nil {
 		return "", fmt.Errorf("nil SID")
 	}
@@ -82,8 +82,8 @@ const maxSIDsPerQuery = 50
 
 // ResolveBatch resolves multiple SIDs, using a single LDAP query per batch
 // of uncached SIDs. Results are keyed by SID string (e.g. "S-1-5-21-...").
-func (r *LDAPSIDResolver) ResolveBatch(sids []*SID) map[string]SIDResult {
-	results := make(map[string]SIDResult, len(sids))
+func (r *ldapSIDResolver) ResolveBatch(sids []*SID) map[string]sidResult {
+	results := make(map[string]sidResult, len(sids))
 
 	// Partition into cached/resolved and needing LDAP lookup.
 	var needQuery []*SID
@@ -93,7 +93,7 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*SID) map[string]SIDResult {
 			continue
 		}
 		if name, ok := r.cache[sid.Value]; ok {
-			results[sid.Value] = SIDResult{Name: name}
+			results[sid.Value] = sidResult{Name: name}
 		} else {
 			needQuery = append(needQuery, sid)
 		}
@@ -112,7 +112,7 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*SID) map[string]SIDResult {
 	return results
 }
 
-func (r *LDAPSIDResolver) queryBatch(sids []*SID, results map[string]SIDResult) {
+func (r *ldapSIDResolver) queryBatch(sids []*SID, results map[string]sidResult) {
 	if len(sids) == 0 {
 		return
 	}
@@ -145,7 +145,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*SID, results map[string]SIDResult) 
 	if err != nil {
 		// Mark all SIDs in this batch as failed.
 		for _, sid := range sids {
-			results[sid.Value] = SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
+			results[sid.Value] = sidResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
 		}
 		return
 	}
@@ -162,7 +162,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*SID, results map[string]SIDResult) 
 		found[sid.Value] = true
 
 		resolvedName := extractName(entry)
-		results[sid.Value] = SIDResult{Name: resolvedName}
+		results[sid.Value] = sidResult{Name: resolvedName}
 
 		r.cacheSID(sid.Value, resolvedName)
 	}
@@ -170,7 +170,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*SID, results map[string]SIDResult) 
 	// Mark SIDs with no LDAP result.
 	for _, sid := range sids {
 		if !found[sid.Value] {
-			results[sid.Value] = SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Value)}
+			results[sid.Value] = sidResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Value)}
 		}
 	}
 }
@@ -188,7 +188,7 @@ func extractName(entry *ldap.Entry) string {
 	return ""
 }
 
-func (r *LDAPSIDResolver) cacheSID(parsed, name string) {
+func (r *ldapSIDResolver) cacheSID(parsed, name string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.maxCacheSize > 0 && len(r.cache) >= r.maxCacheSize {
@@ -197,7 +197,7 @@ func (r *LDAPSIDResolver) cacheSID(parsed, name string) {
 	r.cache[parsed] = name
 }
 
-func (r *LDAPSIDResolver) queryAD(sid *SID) (string, error) {
+func (r *ldapSIDResolver) queryAD(sid *SID) (string, error) {
 	binarySID := sidToBinaryString(sid.Raw)
 
 	searchRequest := ldap.NewSearchRequest(

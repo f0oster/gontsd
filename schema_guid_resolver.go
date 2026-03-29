@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// ErrSchemaGUIDNotFound is returned when a GUID cannot be resolved.
-var ErrSchemaGUIDNotFound = errors.New("GUID not found")
+// errSchemaGUIDNotFound is returned when a GUID cannot be resolved.
+var errSchemaGUIDNotFound = errors.New("GUID not found")
 
 // AppliesToEntry represents a schema class that an extended right applies to.
 type AppliesToEntry struct {
@@ -48,18 +48,18 @@ func (info SchemaGUIDInfo) FormatAppliesTo() string {
 }
 
 // SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
-// Implementations include [WellKnownSchemaGUIDResolver] for well-known schema
-// classes, attributes, and extended rights, [LDAPSchemaGUIDResolver] for Active
-// Directory schema lookups, and [ChainSchemaGUIDResolver] to try multiple
+// Implementations include [wellKnownSchemaGUIDResolver] for well-known schema
+// classes, attributes, and extended rights, [ldapSchemaGUIDResolver] for Active
+// Directory schema lookups, and [chainSchemaGUIDResolver] to try multiple
 // resolvers in order.
 type SchemaGUIDResolver interface {
 	ResolveGUID(guid string) (*SchemaGUIDInfo, error)
 }
 
-// FormatGUID resolves a GUID using the given resolver and returns a
+// formatGUID resolves a GUID using the given resolver and returns a
 // display string like "Name (GUID) [type]". If the GUID cannot be
 // resolved, it returns the raw GUID string.
-func FormatGUID(guid string, resolver SchemaGUIDResolver) string {
+func formatGUID(guid string, resolver SchemaGUIDResolver) string {
 	info, err := resolver.ResolveGUID(guid)
 	if err != nil {
 		return guid
@@ -67,42 +67,42 @@ func FormatGUID(guid string, resolver SchemaGUIDResolver) string {
 	return info.String()
 }
 
-// NormalizeGUID converts a GUID to uppercase for consistent comparison.
-func NormalizeGUID(guid string) string {
+// normalizeGUID converts a GUID to uppercase for consistent comparison.
+func normalizeGUID(guid string) string {
 	return strings.ToUpper(guid)
 }
 
-// NoOpSchemaGUIDResolver is a resolver that always returns ErrSchemaGUIDNotFound.
-type NoOpSchemaGUIDResolver struct{}
+// noOpSchemaGUIDResolver is a resolver that always returns errSchemaGUIDNotFound.
+type noOpSchemaGUIDResolver struct{}
 
-func (NoOpSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
-	return nil, ErrSchemaGUIDNotFound
+func (noOpSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
+	return nil, errSchemaGUIDNotFound
 }
 
-// ChainSchemaGUIDResolver tries multiple resolvers in order until one succeeds.
-type ChainSchemaGUIDResolver struct {
+// chainSchemaGUIDResolver tries multiple resolvers in order until one succeeds.
+type chainSchemaGUIDResolver struct {
 	Resolvers []SchemaGUIDResolver
 }
 
-func (c ChainSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
+func (c chainSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
 	for _, r := range c.Resolvers {
 		info, err := r.ResolveGUID(guid)
 		if err == nil {
 			return info, nil
 		}
 	}
-	return nil, ErrSchemaGUIDNotFound
+	return nil, errSchemaGUIDNotFound
 }
 
-// WellKnownSchemaGUIDResolver resolves GUIDs using a built-in table of well-known values.
-type WellKnownSchemaGUIDResolver struct{}
+// wellKnownSchemaGUIDResolver resolves GUIDs using a built-in table of well-known values.
+type wellKnownSchemaGUIDResolver struct{}
 
-func (WellKnownSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
-	normalizedGUID := NormalizeGUID(guid)
-	if info, ok := WellKnownSchemaGUIDs[normalizedGUID]; ok {
+func (wellKnownSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
+	normalizedGUID := normalizeGUID(guid)
+	if info, ok := wellKnownSchemaGUIDs[normalizedGUID]; ok {
 		return &info, nil
 	}
-	return nil, ErrSchemaGUIDNotFound
+	return nil, errSchemaGUIDNotFound
 }
 
 // Well-known GUIDs for extended rights, property sets, and schema objects
@@ -133,7 +133,7 @@ const (
 	GUIDTypeValidatedWrite GUIDType = "validatedWrite"
 )
 
-var WellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
+var wellKnownSchemaGUIDs = map[string]SchemaGUIDInfo{
 	// Extended Rights - Control Access Rights
 	// https://learn.microsoft.com/en-us/windows/win32/adschema/extended-rights
 

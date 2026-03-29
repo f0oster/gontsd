@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n context. /c/Users/f0oster/Documents/Code/golang/gontsd/resolve/*.go /c/Users/f0oster/Documents/Code/golang/gontsd/*.go)",
+      "Bash(grep:*)"
+    ]
+  }
+}

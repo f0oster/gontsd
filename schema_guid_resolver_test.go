@@ -12,14 +12,14 @@ func TestNormalizeGUID(t *testing.T) {
 		{"", ""},
 	}
 	for _, tc := range tests {
-		if got := NormalizeGUID(tc.input); got != tc.want {
-			t.Errorf("NormalizeGUID(%q) = %q, want %q", tc.input, got, tc.want)
+		if got := normalizeGUID(tc.input); got != tc.want {
+			t.Errorf("normalizeGUID(%q) = %q, want %q", tc.input, got, tc.want)
 		}
 	}
 }
 
 func TestWellKnownSchemaGUIDResolver(t *testing.T) {
-	r := WellKnownSchemaGUIDResolver{}
+	r := wellKnownSchemaGUIDResolver{}
 
 	info, err := r.ResolveGUID("1131F6AD-9C07-11D1-F79F-00C04FC2DCD2")
 	if err != nil {
@@ -36,18 +36,18 @@ func TestWellKnownSchemaGUIDResolver(t *testing.T) {
 }
 
 func TestNoOpSchemaGUIDResolver(t *testing.T) {
-	r := NoOpSchemaGUIDResolver{}
+	r := noOpSchemaGUIDResolver{}
 	_, err := r.ResolveGUID("anything")
-	if err != ErrSchemaGUIDNotFound {
-		t.Errorf("expected ErrSchemaGUIDNotFound, got %v", err)
+	if err != errSchemaGUIDNotFound {
+		t.Errorf("expected errSchemaGUIDNotFound, got %v", err)
 	}
 }
 
 func TestChainSchemaGUIDResolver(t *testing.T) {
-	chain := ChainSchemaGUIDResolver{
+	chain := chainSchemaGUIDResolver{
 		Resolvers: []SchemaGUIDResolver{
-			NoOpSchemaGUIDResolver{},
-			WellKnownSchemaGUIDResolver{},
+			noOpSchemaGUIDResolver{},
+			wellKnownSchemaGUIDResolver{},
 		},
 	}
 	info, err := chain.ResolveGUID("1131F6AD-9C07-11D1-F79F-00C04FC2DCD2")

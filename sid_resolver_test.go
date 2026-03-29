@@ -6,7 +6,7 @@ import (
 )
 
 func TestWellKnownSIDResolver(t *testing.T) {
-	r := WellKnownSIDResolver{}
+	r := wellKnownSIDResolver{}
 
 	// Exact match
 	name, err := r.Resolve(&SID{Value: "S-1-5-18"})
@@ -49,9 +49,9 @@ func TestWellKnownSIDResolver(t *testing.T) {
 }
 
 func TestResolveBatchSIDs_Fallback(t *testing.T) {
-	// WellKnownSIDResolver doesn't implement BatchSIDResolver,
-	// so ResolveBatchSIDs should fall back to individual Resolve calls.
-	resolver := WellKnownSIDResolver{}
+	// wellKnownSIDResolver doesn't implement batchSIDResolver,
+	// so resolveBatchSIDs should fall back to individual Resolve calls.
+	resolver := wellKnownSIDResolver{}
 	sids := []*SID{
 		{Value: "S-1-5-18"},
 		{Value: "S-1-1-0"},
@@ -59,7 +59,7 @@ func TestResolveBatchSIDs_Fallback(t *testing.T) {
 		nil,                                // should be skipped
 	}
 
-	results := ResolveBatchSIDs(resolver, sids)
+	results := resolveBatchSIDs(resolver, sids)
 
 	if r, ok := results["S-1-5-18"]; !ok || r.Err != nil || r.Name != "Local System" {
 		t.Errorf("S-1-5-18 result = %+v, want Local System", results["S-1-5-18"])

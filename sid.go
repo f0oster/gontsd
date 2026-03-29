@@ -29,7 +29,7 @@ func (s *SID) Resolved() string {
 		return "<nil>"
 	}
 	if s.resolver != nil {
-		return FormatSID(s, s.resolver)
+		return formatSID(s, s.resolver)
 	}
 	return s.Value
 }
