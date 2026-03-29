@@ -63,7 +63,6 @@ func main() {
 	}
 
 	runComparisons(resolver, guidResolver)
-	dumpSecurityDescriptor("../test_cases/root_domain/sd-domainroot.bin", resolver, guidResolver)
 }
 
 func runComparisons(resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver) {
@@ -124,38 +123,6 @@ func runComparisons(resolver resolve.SIDResolver, guidResolver resolve.SchemaGUI
 
 		diff := gontsd.Compare(oldSD, newSD)
 		printDiff(diff, resolver, guidResolver)
-	}
-}
-
-func dumpSecurityDescriptor(path string, resolver resolve.SIDResolver, guidResolver resolve.SchemaGUIDResolver) {
-	fmt.Println()
-	fmt.Printf("=== Security Descriptor Dump: %s ===\n", path)
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Printf("Failed to read file: %v\n", err)
-		return
-	}
-
-	sd, err := gontsd.Parse(data)
-	if err != nil {
-		fmt.Printf("Failed to parse SD: %v\n", err)
-		return
-	}
-
-	// Batch-resolve all SIDs upfront so individual lookups are cache hits.
-	resolve.ResolveBatchSIDs(resolver, sd.CollectSIDs())
-
-	fmt.Printf("\nOwner: %s\n", resolve.FormatSID(sd.OwnerSID, resolver))
-	fmt.Printf("Group: %s\n", resolve.FormatSID(sd.GroupSID, resolver))
-	fmt.Printf("Control: %s\n", sd.ControlFlags)
-
-	if sd.DACL != nil {
-		fmt.Printf("\nDACL (%d ACEs):\n", len(sd.DACL.ACEs))
-		for i, ace := range sd.DACL.ACEs {
-			fmt.Printf("\n  [%d] ", i)
-			printACE(ace, resolver, guidResolver, "  ")
-		}
 	}
 }
 
