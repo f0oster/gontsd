@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -32,7 +31,10 @@ func (e AppliesToEntry) String() string {
 }
 
 func (info SchemaGUIDInfo) String() string {
-	return fmt.Sprintf("%s (%s) [%s]", info.Name, info.GUID, info.Type)
+	if info.Name != "" {
+		return info.Name
+	}
+	return info.GUID
 }
 
 // FormatAppliesTo returns the AppliesTo entries as a comma-separated string

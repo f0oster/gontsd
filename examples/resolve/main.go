@@ -91,19 +91,11 @@ func main() {
 			fmt.Printf("      SID:    %s\n", resolve.FormatSID(ace.SID(), sidResolver))
 			fmt.Printf("      Mask:   %s\n", ace.Mask())
 			if guid := ace.ObjectTypeGUID(); guid != "" {
-				fmt.Printf("      ObjectType: %s\n", resolveGUID(guid, guidResolver))
+				fmt.Printf("      ObjectType: %s\n", resolve.FormatGUID(guid, guidResolver))
 			}
 			if guid := ace.InheritedObjectTypeGUID(); guid != "" {
-				fmt.Printf("      InheritedObjectType: %s\n", resolveGUID(guid, guidResolver))
+				fmt.Printf("      InheritedObjectType: %s\n", resolve.FormatGUID(guid, guidResolver))
 			}
 		}
 	}
-}
-
-func resolveGUID(guid string, resolver resolve.SchemaGUIDResolver) string {
-	info, err := resolver.ResolveGUID(guid)
-	if err != nil {
-		return guid
-	}
-	return fmt.Sprintf("%s (%s) [%s]", info.Name, guid, info.Type)
 }
