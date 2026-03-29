@@ -9,7 +9,7 @@ func TestWellKnownSIDResolver(t *testing.T) {
 	r := WellKnownSIDResolver{}
 
 	// Exact match
-	name, err := r.Resolve(&SID{Parsed: "S-1-5-18"})
+	name, err := r.Resolve(&SID{Value: "S-1-5-18"})
 	if err != nil {
 		t.Fatalf("Resolve(S-1-5-18) error: %v", err)
 	}
@@ -18,7 +18,7 @@ func TestWellKnownSIDResolver(t *testing.T) {
 	}
 
 	// Domain-relative RID matching
-	name, err = r.Resolve(&SID{Parsed: "S-1-5-21-75115020-4145467708-3593911600-512"})
+	name, err = r.Resolve(&SID{Value: "S-1-5-21-75115020-4145467708-3593911600-512"})
 	if err != nil {
 		t.Fatalf("Resolve(domain admin) error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestWellKnownSIDResolver(t *testing.T) {
 	}
 
 	// Domain-relative RID with different domain identifier
-	name, err = r.Resolve(&SID{Parsed: "S-1-5-21-999999-888888-777777-500"})
+	name, err = r.Resolve(&SID{Value: "S-1-5-21-999999-888888-777777-500"})
 	if err != nil {
 		t.Fatalf("Resolve(administrator) error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestWellKnownSIDResolver(t *testing.T) {
 	}
 
 	// Unknown domain RID
-	_, err = r.Resolve(&SID{Parsed: "S-1-5-21-1-2-3-9999"})
+	_, err = r.Resolve(&SID{Value: "S-1-5-21-1-2-3-9999"})
 	if err == nil {
 		t.Error("expected error for unknown domain RID")
 	}
@@ -53,9 +53,9 @@ func TestResolveBatchSIDs_Fallback(t *testing.T) {
 	// so ResolveBatchSIDs should fall back to individual Resolve calls.
 	resolver := WellKnownSIDResolver{}
 	sids := []*SID{
-		{Parsed: "S-1-5-18"},
-		{Parsed: "S-1-1-0"},
-		{Parsed: "S-1-5-21-1-2-3-99999"}, // unknown
+		{Value: "S-1-5-18"},
+		{Value: "S-1-1-0"},
+		{Value: "S-1-5-21-1-2-3-99999"}, // unknown
 		nil,                                // should be skipped
 	}
 

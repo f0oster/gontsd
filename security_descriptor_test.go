@@ -52,10 +52,10 @@ func TestParse_AddingNewUser(t *testing.T) {
 			if sd.ControlFlags != 0x8404 {
 				t.Errorf("ControlFlags = 0x%04X, want 0x8404", sd.ControlFlags)
 			}
-			if sd.OwnerSID == nil || sd.OwnerSID.Parsed != tc.ownerSID {
+			if sd.OwnerSID == nil || sd.OwnerSID.Value != tc.ownerSID {
 				t.Errorf("OwnerSID = %v, want %s", sd.OwnerSID, tc.ownerSID)
 			}
-			if sd.GroupSID == nil || sd.GroupSID.Parsed != tc.groupSID {
+			if sd.GroupSID == nil || sd.GroupSID.Value != tc.groupSID {
 				t.Errorf("GroupSID = %v, want %s", sd.GroupSID, tc.groupSID)
 			}
 			if sd.DACL == nil {
@@ -122,7 +122,7 @@ func TestParse_RootDomain(t *testing.T) {
 	if sd.Revision != 1 {
 		t.Errorf("Revision = %d, want 1", sd.Revision)
 	}
-	if sd.OwnerSID == nil || sd.OwnerSID.Parsed != "S-1-5-32-544" {
+	if sd.OwnerSID == nil || sd.OwnerSID.Value != "S-1-5-32-544" {
 		t.Errorf("OwnerSID = %v, want S-1-5-32-544", sd.OwnerSID)
 	}
 	if sd.DACL == nil {
@@ -206,17 +206,17 @@ func TestCollectSIDs(t *testing.T) {
 	// Check deduplication — no SID string should appear twice.
 	seen := make(map[string]bool)
 	for _, sid := range sids {
-		if seen[sid.Parsed] {
-			t.Errorf("duplicate SID: %s", sid.Parsed)
+		if seen[sid.Value] {
+			t.Errorf("duplicate SID: %s", sid.Value)
 		}
-		seen[sid.Parsed] = true
+		seen[sid.Value] = true
 	}
 
 	// Owner and group should be included.
-	if !seen[sd.OwnerSID.Parsed] {
+	if !seen[sd.OwnerSID.Value] {
 		t.Error("OwnerSID not in CollectSIDs result")
 	}
-	if !seen[sd.GroupSID.Parsed] {
+	if !seen[sd.GroupSID.Value] {
 		t.Error("GroupSID not in CollectSIDs result")
 	}
 }

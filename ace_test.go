@@ -33,7 +33,7 @@ func TestParseACE_AccessAllowed(t *testing.T) {
 	if ace.Mask() != 0x001F01FF {
 		t.Errorf("Mask() = %s, want 0x001F01FF", ace.Mask())
 	}
-	if ace.SID() == nil || ace.SID().Parsed != "S-1-5-18" {
+	if ace.SID() == nil || ace.SID().Value != "S-1-5-18" {
 		t.Errorf("GetSID() = %v, want S-1-5-18", ace.SID())
 	}
 	if _, ok := ace.(*AccessAllowedACE); !ok {
@@ -76,7 +76,7 @@ func TestParseACE_UnsupportedType(t *testing.T) {
 		t.Errorf("aceLen = %d, want %d", aceLen, len(data))
 	}
 	// RawACE now parses common fields when possible
-	if raw.SID() == nil || raw.SID().Parsed != "S-1-5-18" {
+	if raw.SID() == nil || raw.SID().Value != "S-1-5-18" {
 		t.Errorf("RawACE.SID() = %v, want S-1-5-18", raw.SID())
 	}
 }

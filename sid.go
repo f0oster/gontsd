@@ -9,7 +9,7 @@ import (
 // See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/78eb9013-1c3a-4970-ad1f-2b1dad588a25
 type SID struct {
 	Raw    []byte
-	Parsed string
+	Value string
 
 	resolver SIDResolver
 }
@@ -18,7 +18,7 @@ func (s *SID) String() string {
 	if s == nil {
 		return "<nil>"
 	}
-	return s.Parsed
+	return s.Value
 }
 
 // Resolved returns the resolved display name if a resolver was set
@@ -31,7 +31,7 @@ func (s *SID) Resolved() string {
 	if s.resolver != nil {
 		return FormatSID(s, s.resolver)
 	}
-	return s.Parsed
+	return s.Value
 }
 
 func parseSID(data []byte) (*SID, int, error) {
@@ -73,6 +73,6 @@ func parseSID(data []byte) (*SID, int, error) {
 	// SID resolution is delegated to SIDResolver implementations in the resolve package
 	return &SID{
 		Raw:    raw,
-		Parsed: sidStr,
+		Value: sidStr,
 	}, sidLen, nil
 }

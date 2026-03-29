@@ -57,8 +57,8 @@ func TestParseSID(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parseSID() error: %v", err)
 			}
-			if sid.Parsed != tc.wantSID {
-				t.Errorf("parseSID().Parsed = %q, want %q", sid.Parsed, tc.wantSID)
+			if sid.Value != tc.wantSID {
+				t.Errorf("parseSID().Value = %q, want %q", sid.Value, tc.wantSID)
 			}
 			if sidLen != tc.wantLen {
 				t.Errorf("parseSID() length = %d, want %d", sidLen, tc.wantLen)
@@ -91,7 +91,7 @@ func TestParseSID_Errors(t *testing.T) {
 }
 
 func TestSID_String(t *testing.T) {
-	sid := &SID{Parsed: "S-1-5-18"}
+	sid := &SID{Value: "S-1-5-18"}
 	s := sid.String()
 	if s != "S-1-5-18" {
 		t.Errorf("SID.String() = %q, want %q", s, "S-1-5-18")

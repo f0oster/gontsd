@@ -196,18 +196,18 @@ func (WellKnownSIDResolver) Resolve(sid *SID) (string, error) {
 	if sid == nil {
 		return "", fmt.Errorf("nil SID")
 	}
-	if name, ok := WellKnownSIDs[sid.Parsed]; ok {
+	if name, ok := WellKnownSIDs[sid.Value]; ok {
 		return name, nil
 	}
-	if strings.HasPrefix(sid.Parsed, "S-1-5-21-") {
-		if i := strings.LastIndex(sid.Parsed, "-"); i >= 0 {
-			rid := sid.Parsed[i+1:]
+	if strings.HasPrefix(sid.Value, "S-1-5-21-") {
+		if i := strings.LastIndex(sid.Value, "-"); i >= 0 {
+			rid := sid.Value[i+1:]
 			if name, ok := domainRelativeRIDs[rid]; ok {
 				return name, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("unknown SID: %s", sid.Parsed)
+	return "", fmt.Errorf("unknown SID: %s", sid.Value)
 }
 
 // ChainSIDResolver tries multiple resolvers in order until one succeeds.
@@ -221,7 +221,7 @@ func (c ChainSIDResolver) Resolve(sid *SID) (string, error) {
 			return name, nil
 		}
 	}
-	return "", fmt.Errorf("no resolver could resolve SID: %s", sid.Parsed)
+	return "", fmt.Errorf("no resolver could resolve SID: %s", sid.Value)
 }
 
 // SIDResult holds the outcome of resolving a single SID.
@@ -251,7 +251,7 @@ func ResolveBatchSIDs(resolver SIDResolver, sids []*SID) map[string]SIDResult {
 			continue
 		}
 		name, err := resolver.Resolve(sid)
-		results[sid.Parsed] = SIDResult{Name: name, Err: err}
+		results[sid.Value] = SIDResult{Name: name, Err: err}
 	}
 	return results
 }
@@ -265,9 +265,9 @@ func FormatSID(sid *SID, resolver SIDResolver) string {
 	}
 	name, err := resolver.Resolve(sid)
 	if err != nil {
-		return sid.Parsed
+		return sid.Value
 	}
-	return fmt.Sprintf("%s (%s)", name, sid.Parsed)
+	return fmt.Sprintf("%s (%s)", name, sid.Value)
 }
 
 func findBatchResolver(r SIDResolver) (BatchSIDResolver, bool) {

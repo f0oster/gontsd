@@ -172,8 +172,8 @@ func (sd *SecurityDescriptor) CollectSIDs() []*SID {
 	var sids []*SID
 
 	add := func(sid *SID) {
-		if sid != nil && !seen[sid.Parsed] {
-			seen[sid.Parsed] = true
+		if sid != nil && !seen[sid.Value] {
+			seen[sid.Value] = true
 			sids = append(sids, sid)
 		}
 	}

@@ -134,7 +134,7 @@ func (d *DiffResult) HasChanges() bool {
 //	if diff.HasChanges() {
 //	    for _, d := range diff.DACLDiff.ACEDiffs {
 //	        if d.Type.Has(gontsd.DiffModified) {
-//	            fmt.Printf("modified: %s\n", d.NewACE.SID().Parsed)
+//	            fmt.Printf("modified: %s\n", d.NewACE.SID().Value)
 //	        }
 //	    }
 //	}
@@ -192,7 +192,7 @@ func sidEqual(a, b *SID) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	return a.Parsed == b.Parsed
+	return a.Value == b.Value
 }
 
 func compareACL(old, new *ACL) *ACLDiff {
@@ -401,7 +401,7 @@ func aceIdentity(ace ACE) string {
 	sid := ace.SID()
 	sidStr := "<nil>"
 	if sid != nil {
-		sidStr = sid.Parsed
+		sidStr = sid.Value
 	}
 	if objGUID := ace.ObjectTypeGUID(); objGUID != nil {
 		return fmt.Sprintf("0x%02X:%s:%s", ace.Type(), sidStr, objGUID.Raw)

@@ -63,7 +63,7 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 	}
 
 	r.mu.RLock()
-	if name, ok := r.cache[sid.Parsed]; ok {
+	if name, ok := r.cache[sid.Value]; ok {
 		r.mu.RUnlock()
 		return name, nil
 	}
@@ -74,7 +74,7 @@ func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
 		return "", err
 	}
 
-	r.cacheSID(sid.Parsed, name)
+	r.cacheSID(sid.Value, name)
 
 	return name, nil
 }
@@ -93,8 +93,8 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) map[string]gontsd.SID
 		if sid == nil {
 			continue
 		}
-		if name, ok := r.cache[sid.Parsed]; ok {
-			results[sid.Parsed] = gontsd.SIDResult{Name: name}
+		if name, ok := r.cache[sid.Value]; ok {
+			results[sid.Value] = gontsd.SIDResult{Name: name}
 		} else {
 			needQuery = append(needQuery, sid)
 		}
@@ -146,7 +146,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gont
 	if err != nil {
 		// Mark all SIDs in this batch as failed.
 		for _, sid := range sids {
-			results[sid.Parsed] = gontsd.SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
+			results[sid.Value] = gontsd.SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
 		}
 		return
 	}
@@ -160,18 +160,18 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gont
 		if !ok {
 			continue
 		}
-		found[sid.Parsed] = true
+		found[sid.Value] = true
 
 		resolvedName := extractName(entry)
-		results[sid.Parsed] = gontsd.SIDResult{Name: resolvedName}
+		results[sid.Value] = gontsd.SIDResult{Name: resolvedName}
 
-		r.cacheSID(sid.Parsed, resolvedName)
+		r.cacheSID(sid.Value, resolvedName)
 	}
 
 	// Mark SIDs with no LDAP result.
 	for _, sid := range sids {
-		if !found[sid.Parsed] {
-			results[sid.Parsed] = gontsd.SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Parsed)}
+		if !found[sid.Value] {
+			results[sid.Value] = gontsd.SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Value)}
 		}
 	}
 }
@@ -217,12 +217,12 @@ func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
 	}
 
 	if len(sr.Entries) == 0 {
-		return "", fmt.Errorf("SID not found in AD: %s", sid.Parsed)
+		return "", fmt.Errorf("SID not found in AD: %s", sid.Value)
 	}
 
 	name := extractName(sr.Entries[0])
 	if name == "" {
-		return "", fmt.Errorf("no name attributes found for SID: %s", sid.Parsed)
+		return "", fmt.Errorf("no name attributes found for SID: %s", sid.Value)
 	}
 	return name, nil
 }

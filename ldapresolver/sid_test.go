@@ -49,7 +49,7 @@ func TestSIDFromString_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}
-	if sd.OwnerSID == nil || sd.OwnerSID.Parsed != sidStr {
+	if sd.OwnerSID == nil || sd.OwnerSID.Value != sidStr {
 		t.Errorf("round-trip SID = %v, want %s", sd.OwnerSID, sidStr)
 	}
 	if !bytes.Equal(sd.OwnerSID.Raw, raw) {
