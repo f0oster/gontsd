@@ -181,17 +181,6 @@ func TestParse_MinimalValid(t *testing.T) {
 	}
 }
 
-func TestParseToString(t *testing.T) {
-	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	s, err := ParseToString(data)
-	if err != nil {
-		t.Fatalf("ParseToString() error: %v", err)
-	}
-	if s == "" {
-		t.Error("ParseToString() returned empty string")
-	}
-}
-
 func TestSecurityDescriptor_String_Nil(t *testing.T) {
 	var sd *SecurityDescriptor
 	if s := sd.String(); s != "<nil>" {

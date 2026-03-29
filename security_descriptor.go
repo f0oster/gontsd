@@ -47,16 +47,6 @@ func Parse(data []byte, r *Resolver) (*SecurityDescriptor, error) {
 	return sd, nil
 }
 
-// ParseToString is a convenience wrapper that parses and returns the
-// string representation of the security descriptor.
-func ParseToString(data []byte) (string, error) {
-	sd, err := parseSecurityDescriptor(data)
-	if err != nil {
-		return "", err
-	}
-	return sd.String(), nil
-}
-
 func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 	if len(descriptor) < 20 {
 		return nil, fmt.Errorf("descriptor too short")
@@ -76,13 +66,13 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		dacl := &ACL{
 			Revision: descriptor[sd.daclOffset],
 			sbz1:     descriptor[sd.daclOffset+1],
-			Size:     binary.LittleEndian.Uint16(descriptor[sd.daclOffset+2:]),
-			Count:    binary.LittleEndian.Uint16(descriptor[sd.daclOffset+4:]),
+			size:     binary.LittleEndian.Uint16(descriptor[sd.daclOffset+2:]),
+			count:    binary.LittleEndian.Uint16(descriptor[sd.daclOffset+4:]),
 			sbz2:     binary.LittleEndian.Uint16(descriptor[sd.daclOffset+6:]),
 		}
 		offset := sd.daclOffset + 8
-		dacl.ACEs = make([]ACE, dacl.Count)
-		for i := 0; i < int(dacl.Count); i++ {
+		dacl.ACEs = make([]ACE, dacl.count)
+		for i := 0; i < int(dacl.count); i++ {
 			ace, aceLen, err := parseACE(descriptor[offset:])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse DACL ACE %d: %w", i, err)
@@ -97,13 +87,13 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		sacl := &ACL{
 			Revision: descriptor[sd.saclOffset],
 			sbz1:     descriptor[sd.saclOffset+1],
-			Size:     binary.LittleEndian.Uint16(descriptor[sd.saclOffset+2:]),
-			Count:    binary.LittleEndian.Uint16(descriptor[sd.saclOffset+4:]),
+			size:     binary.LittleEndian.Uint16(descriptor[sd.saclOffset+2:]),
+			count:    binary.LittleEndian.Uint16(descriptor[sd.saclOffset+4:]),
 			sbz2:     binary.LittleEndian.Uint16(descriptor[sd.saclOffset+6:]),
 		}
 		offset := sd.saclOffset + 8
-		sacl.ACEs = make([]ACE, sacl.Count)
-		for i := 0; i < int(sacl.Count); i++ {
+		sacl.ACEs = make([]ACE, sacl.count)
+		for i := 0; i < int(sacl.count); i++ {
 			ace, aceLen, err := parseACE(descriptor[offset:])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse SACL ACE %d: %w", i, err)

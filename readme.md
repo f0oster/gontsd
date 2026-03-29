@@ -24,7 +24,7 @@ sd, err := gontsd.Parse(data, r)
 client, _ := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{...})
 defer client.Close()
 r, _ := ldapresolver.NewLDAPResolver(client)
-sd, err := gontsd.Parse(data, &r.Resolver)
+sd, err := gontsd.Parse(data, r)
 ```
 
 Once parsed, the security descriptor exposes the owner, group, control flags, DACL, and SACL:
@@ -117,7 +117,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-sd, err := gontsd.Parse(data, &r.Resolver)
+sd, err := gontsd.Parse(data, r)
 ```
 
 The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, you can implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly.

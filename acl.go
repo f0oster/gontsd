@@ -9,8 +9,8 @@ import (
 type ACL struct {
 	Revision uint8
 	sbz1     uint8
-	Size     uint16
-	Count    uint16
+	size     uint16
+	count    uint16
 	sbz2     uint16
 	ACEs     []ACE
 }
@@ -20,7 +20,7 @@ func (acl *ACL) String() string {
 		return "<nil>"
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("ACL (Revision: %d, ACE count: %d)\n", acl.Revision, acl.Count))
+	sb.WriteString(fmt.Sprintf("ACL (Revision: %d, ACE count: %d)\n", acl.Revision, len(acl.ACEs)))
 	for i, ace := range acl.ACEs {
 		sb.WriteString(fmt.Sprintf("  ACE[%d]:\n%s\n", i, indent(ace.String(), "    ")))
 	}

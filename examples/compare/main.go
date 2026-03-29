@@ -49,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	runComparisons(&r.Resolver)
+	runComparisons(r)
 }
 
 func runComparisons(r *gontsd.Resolver) {

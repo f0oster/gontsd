@@ -1,5 +1,7 @@
 package gontsd
 
+import "strings"
+
 // ACEFlags represents the 8-bit inheritance and audit flags in an ACE header.
 // See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
 type ACEFlags uint8
@@ -43,4 +45,12 @@ func (f ACEFlags) Names() []string {
 		}
 	}
 	return names
+}
+
+func (f ACEFlags) String() string {
+	names := f.Names()
+	if len(names) == 0 {
+		return "0x00"
+	}
+	return strings.Join(names, "|")
 }

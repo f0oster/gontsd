@@ -49,9 +49,9 @@ func (t ACEType) String() string {
 	}
 }
 
-// ACEHeader is the common header for all ACE types.
+// aceHeader is the common header for all ACE types.
 // See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/628ebb1d-c509-4ea0-a10f-77ef97ca4586
-type ACEHeader struct {
+type aceHeader struct {
 	AceType  ACEType
 	AceFlags uint8
 	AceSize  uint16
@@ -72,7 +72,7 @@ type ACE interface {
 
 // aceBase contains the fields common to every ACE type.
 type aceBase struct {
-	Header              ACEHeader
+	Header              aceHeader
 	mask                uint32
 	sid                 *SID
 	objectType          *GUID
@@ -279,7 +279,7 @@ func parseACE(data []byte) (ACE, int, error) {
 			return &AccessDeniedCallbackObjectACE{aceBase: base, appData: appData}
 		})
 	default:
-		header, err := parseACEHeader(data)
+		header, err := parseaceHeader(data)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -299,11 +299,11 @@ func parseACE(data []byte) (ACE, int, error) {
 	}
 }
 
-func parseACEHeader(data []byte) (ACEHeader, error) {
+func parseaceHeader(data []byte) (aceHeader, error) {
 	if len(data) < 4 {
-		return ACEHeader{}, fmt.Errorf("data too short for ACE header")
+		return aceHeader{}, fmt.Errorf("data too short for ACE header")
 	}
-	return ACEHeader{
+	return aceHeader{
 		AceType:  ACEType(data[0]),
 		AceFlags: data[1],
 		AceSize:  binary.LittleEndian.Uint16(data[2:4]),
@@ -313,7 +313,7 @@ func parseACEHeader(data []byte) (ACEHeader, error) {
 // parseAceBase parses the common header + mask + SID, returning the base and
 // the number of bytes consumed for the SID (needed by callback ACE types).
 func parseAceBase(data []byte) (aceBase, int, error) {
-	header, err := parseACEHeader(data)
+	header, err := parseaceHeader(data)
 	if err != nil {
 		return aceBase{}, 0, err
 	}
@@ -338,7 +338,7 @@ func parseSimpleACE(data []byte) (aceBase, error) {
 }
 
 func parseObjectACE(data []byte, build func(aceBase) ACE) (ACE, int, error) {
-	header, err := parseACEHeader(data)
+	header, err := parseaceHeader(data)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -407,7 +407,7 @@ func parseCallbackACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, e
 }
 
 func parseCallbackObjectACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, error) {
-	header, err := parseACEHeader(data)
+	header, err := parseaceHeader(data)
 	if err != nil {
 		return nil, 0, err
 	}
