@@ -104,6 +104,35 @@ func (a *AccessDeniedACE) String() string {
 	return fmt.Sprintf("AccessDeniedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
 }
 
+// SystemAuditACE generates an audit record when a trustee attempts to exercise the specified access rights.
+type SystemAuditACE struct {
+	aceBase
+}
+
+func (a *SystemAuditACE) String() string {
+	return fmt.Sprintf("SystemAuditACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
+}
+
+// SystemAuditObjectACE generates an audit record for a specific object type or property.
+type SystemAuditObjectACE struct {
+	aceBase
+	ObjectFlags         uint32
+	ObjectType          [16]byte
+	InheritedObjectType [16]byte
+}
+
+func (a *SystemAuditObjectACE) ObjectTypeGUID() string {
+	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
+}
+
+func (a *SystemAuditObjectACE) InheritedObjectTypeGUID() string {
+	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
+}
+
+func (a *SystemAuditObjectACE) String() string {
+	return fmt.Sprintf("SystemAuditObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
+}
+
 // AccessAllowedObjectACE grants access rights to a trustee for a specific object type or property.
 type AccessAllowedObjectACE struct {
 	aceBase
@@ -268,6 +297,12 @@ func parseACE(data []byte) (ACE, int, error) {
 			return nil, 0, err
 		}
 		return &AccessDeniedACE{aceBase: a}, int(a.Header.AceSize), nil
+	case SystemAuditACEType:
+		a, err := parseSimpleACE(data)
+		if err != nil {
+			return nil, 0, err
+		}
+		return &SystemAuditACE{aceBase: a}, int(a.Header.AceSize), nil
 	case AccessAllowedObjectACEType:
 		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
 			return &AccessAllowedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
@@ -275,6 +310,10 @@ func parseACE(data []byte) (ACE, int, error) {
 	case AccessDeniedObjectACEType:
 		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
 			return &AccessDeniedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		})
+	case SystemAuditObjectACEType:
+		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
+			return &SystemAuditObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
 		})
 	case AccessAllowedCallbackACEType:
 		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
