@@ -54,6 +54,17 @@ type SchemaGUIDResolver interface {
 	ResolveGUID(guid string) (*SchemaGUIDInfo, error)
 }
 
+// FormatGUID resolves a GUID using the given resolver and returns a
+// display string like "Name (GUID) [type]". If the GUID cannot be
+// resolved, it returns the raw GUID string.
+func FormatGUID(guid string, resolver SchemaGUIDResolver) string {
+	info, err := resolver.ResolveGUID(guid)
+	if err != nil {
+		return guid
+	}
+	return info.String()
+}
+
 // NormalizeGUID converts a GUID to uppercase for consistent comparison.
 func NormalizeGUID(guid string) string {
 	return strings.ToUpper(guid)
