@@ -15,6 +15,26 @@ func NewResolver() *Resolver {
 	}
 }
 
+// NewResolverWith creates a resolver that chains the built-in well-known
+// tables with custom [SIDResolver] and [SchemaGUIDResolver] implementations.
+// Well-known lookups are tried first, falling back to the provided resolvers.
+func NewResolverWith(sids SIDResolver, guids SchemaGUIDResolver) *Resolver {
+	return &Resolver{
+		SIDs: chainSIDResolver{
+			Resolvers: []SIDResolver{
+				wellKnownSIDResolver{},
+				sids,
+			},
+		},
+		GUIDs: chainSchemaGUIDResolver{
+			Resolvers: []SchemaGUIDResolver{
+				wellKnownSchemaGUIDResolver{},
+				guids,
+			},
+		},
+	}
+}
+
 // NewLDAPResolver creates a resolver backed by both well-known tables
 // and LDAP queries. It preloads the schema from AD, so construction
 // may take a moment on large directories.

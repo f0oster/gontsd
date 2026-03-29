@@ -6,7 +6,7 @@
 // tables, or [NewLDAPResolver] for Active Directory lookups.
 //
 // For custom directory backends, implement the [SIDResolver] and
-// [SchemaGUIDResolver] interfaces directly.
+// [SchemaGUIDResolver] interfaces and pass them to [NewResolverWith].
 //
 // References:
 //   - MS-DTYP (Security Descriptor structure): https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/

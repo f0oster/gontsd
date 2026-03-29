@@ -156,7 +156,14 @@ sd, err := gontsd.Parse(data, r)
 
 Resolution is automatic - `Parse` batch-resolves all SIDs upfront and stores the resolver on each SID and GUID. The results flow through `Compare` too, since the diff references the same SID/GUID pointers from the parsed descriptors.
 
-The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly.
+The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces and pass them to `NewResolverWith`:
+
+```go
+r := gontsd.NewResolverWith(myCustomSIDResolver{}, myCustomGUIDResolver{})
+sd, err := gontsd.Parse(data, r)
+```
+
+This chains the built-in well-known tables with your custom resolvers, so well-known SIDs and GUIDs resolve instantly and everything else falls through to your implementation.
 
 ## Examples
 
@@ -181,6 +188,7 @@ go run ./examples/dump \
 | `Parse(data, r)` | Parse binary security descriptor bytes, optionally resolving SIDs and GUIDs |
 | `Compare(old, new)` | Diff two security descriptors |
 | `NewResolver()` | Create a resolver using built-in well-known tables |
+| `NewResolverWith(sids, guids)` | Create a resolver chaining built-in tables with custom resolvers |
 | `NewLDAPResolver(client)` | Create a resolver backed by Active Directory |
 | `NewLDAPClient(config)` | Establish an LDAP connection for use with `NewLDAPResolver` |
 
