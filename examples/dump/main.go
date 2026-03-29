@@ -113,14 +113,25 @@ func printACL(name string, acl *gontsd.ACL) {
 	}
 	fmt.Printf("\n%s (%d ACEs):\n", name, len(acl.ACEs))
 	for i, ace := range acl.ACEs {
-		fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
+		flags := ace.AceFlags()
+		if flags.Has(gontsd.INHERITED_ACE) {
+			fmt.Printf("\n  [%d] %sACE [INHERITED]\n", i, ace.Type())
+		} else {
+			fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
+		}
 		fmt.Printf("      Trustee: %s\n", ace.SID().Resolved())
 		fmt.Printf("      Mask:    %s\n", ace.Mask())
+		if otherFlags := flags &^ gontsd.INHERITED_ACE; otherFlags != 0 {
+			fmt.Printf("      Flags:   %v\n", otherFlags.Names())
+		}
 		if guid := ace.ObjectTypeGUID(); guid != nil {
-			fmt.Printf("      ObjectType: %s\n", guid.Resolved())
+			fmt.Printf("      ObjectType: %s (%s)\n", guid.Resolved(), guid.Type)
+			if guid.Description != "" {
+				fmt.Printf("          %s\n", guid.Description)
+			}
 		}
 		if guid := ace.InheritedObjectTypeGUID(); guid != nil {
-			fmt.Printf("      InheritedObjectType: %s\n", guid.Resolved())
+			fmt.Printf("      InheritedObjectType: %s (%s)\n", guid.Resolved(), guid.Type)
 		}
 		if appData := ace.ApplicationData(); len(appData) > 0 {
 			fmt.Printf("      Condition: %d bytes\n", len(appData))

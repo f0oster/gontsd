@@ -148,18 +148,27 @@ func (sd *SecurityDescriptor) resolve(r *Resolver) {
 		}
 		for _, ace := range acl.ACEs {
 			setResolver(ace.SID())
-			// Set GUID resolver on object ACE types
-			if guid := ace.ObjectTypeGUID(); guid != nil {
-				guid.resolver = r.GUIDs
-			}
-			if guid := ace.InheritedObjectTypeGUID(); guid != nil {
-				guid.resolver = r.GUIDs
-			}
+			resolveGUID(ace.ObjectTypeGUID(), r.GUIDs)
+			resolveGUID(ace.InheritedObjectTypeGUID(), r.GUIDs)
 		}
 	}
 
 	// Batch-resolve all SIDs upfront
 	ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
+}
+
+func resolveGUID(guid *GUID, resolver SchemaGUIDResolver) {
+	if guid == nil || resolver == nil {
+		return
+	}
+	guid.resolver = resolver
+	info, err := resolver.ResolveGUID(guid.Raw)
+	if err != nil {
+		return
+	}
+	guid.Name = info.Name
+	guid.Type = info.Type
+	guid.Description = info.Description
 }
 
 // CollectSIDs returns all unique SIDs referenced by this security descriptor,
