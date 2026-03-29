@@ -10,27 +10,36 @@ go get github.com/f0oster/gontsd
 
 ## Parsing
 
-`Parse` takes the raw bytes of an NT security descriptor and returns the owner, group, control flags, DACL, and SACL:
+`Parse` takes the raw bytes of an NT security descriptor and an optional resolver. When a resolver is provided, all SIDs and GUIDs are resolved automatically:
 
 ```go
-// data is the raw binary ntSecurityDescriptor, e.g. from an LDAP query
-sd, err := gontsd.Parse(data)
-if err != nil {
-    log.Fatal(err)
-}
+// Parse without resolution
+sd, err := gontsd.Parse(data, nil)
 
-fmt.Println(sd.OwnerSID)    // S-1-5-32-544
-fmt.Println(sd.ControlFlags) // SE_DACL_PRESENT|SE_DACL_AUTO_INHERITED|SE_SELF_RELATIVE
+// Parse with built-in well-known tables
+r := gontsd.NewResolver()
+sd, err := gontsd.Parse(data, r)
 
-// Walk the DACL to inspect each access control entry
+// Parse with LDAP resolution
+client, _ := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{...})
+defer client.Close()
+r, _ := ldapresolver.NewLDAPResolver(client)
+sd, err := gontsd.Parse(data, &r.Resolver)
+```
+
+Once parsed, the security descriptor exposes the owner, group, control flags, DACL, and SACL:
+
+```go
+fmt.Println(sd.OwnerSID)           // S-1-5-32-544
+fmt.Println(sd.OwnerSID.Resolved()) // BUILTIN\Administrators (S-1-5-32-544)
+fmt.Println(sd.ControlFlags)        // SE_DACL_PRESENT|SE_DACL_AUTO_INHERITED|SE_SELF_RELATIVE
+
 for _, ace := range sd.DACL.ACEs {
-    fmt.Printf("%s %s %s\n", ace.Type(), ace.SID(), ace.Mask())
-    // AccessAllowed S-1-5-18 RIGHT_GENERIC_ALL
-    // AccessAllowedObject S-1-5-32-544 RIGHT_DS_CONTROL_ACCESS
+    fmt.Printf("%s %s %s\n", ace.Type(), ace.SID().Resolved(), ace.Mask())
+    // AccessAllowed Local System (S-1-5-18) RIGHT_GENERIC_ALL
 
-    // Object ACEs scope permissions to a specific schema class or property
-    if guid := ace.ObjectTypeGUID(); guid != "" {
-        fmt.Printf("  applies to: %s\n", guid)
+    if guid := ace.ObjectTypeGUID(); guid != nil {
+        fmt.Println(guid.Resolved()) // User-Force-Change-Password
     }
 }
 ```
@@ -49,26 +58,25 @@ if ace.AceFlags().Has(gontsd.INHERITED_ACE) {
 
 ## Comparing
 
-`Compare` detects changes between two security descriptors, including owner, group, control flags, and individual ACE changes in the DACL and SACL:
+`Compare` detects changes between two security descriptors. If the SDs were parsed with a resolver, the diff results are automatically resolved too:
 
 ```go
+oldSD, _ := gontsd.Parse(oldData, r)
+newSD, _ := gontsd.Parse(newData, r)
 diff := gontsd.Compare(oldSD, newSD)
 
 if diff.OwnerChanged {
-    fmt.Printf("Owner: %s -> %s\n", diff.OldOwner, diff.NewOwner)
+    fmt.Printf("Owner: %s -> %s\n", diff.OldOwner.Resolved(), diff.NewOwner.Resolved())
 }
 
 if diff.DACLDiff != nil {
     for _, d := range diff.DACLDiff.ACEDiffs {
         if d.Type.Has(gontsd.DiffAdded) {
-            fmt.Printf("[+] %s %s\n", d.NewACE.SID(), d.NewACE.Mask())
-        }
-        if d.Type.Has(gontsd.DiffRemoved) {
-            fmt.Printf("[-] %s %s\n", d.OldACE.SID(), d.OldACE.Mask())
+            fmt.Printf("[+] %s %s\n", d.NewACE.SID().Resolved(), d.NewACE.Mask())
         }
         if d.Type.Has(gontsd.DiffModified) {
             added, removed, _ := d.CompareAccessRights()
-            fmt.Printf("[~] %s +%v -%v\n", d.NewACE.SID(), added, removed)
+            fmt.Printf("[~] %s +%v -%v\n", d.NewACE.SID().Resolved(), added, removed)
         }
     }
 }
@@ -76,13 +84,24 @@ if diff.DACLDiff != nil {
 
 `DiffType` is a bitmask — an ACE that is both modified and moved will have `DiffModified | DiffReordered` set.
 
-## SID and GUID Resolution
+## Resolution
 
-The `resolve` package translates raw SIDs and schema GUIDs into human-readable names. Use `NewResolver()` for built-in well-known tables, or `NewLDAPResolver()` to also query Active Directory for domain-specific SIDs and custom schema objects.
+SIDs and GUIDs carry their resolver internally after `Parse`. Call `.Resolved()` anywhere to get the human-readable name, or `.String()` for the raw value:
 
 ```go
-// Connect to AD
-client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
+sid.String()    // "S-1-5-32-544"
+sid.Resolved()  // "BUILTIN\Administrators (S-1-5-32-544)"
+
+guid.String()   // "00299570-246D-11D0-A768-00AA006E0529"
+guid.Resolved() // "User-Force-Change-Password"
+```
+
+`NewResolver()` provides built-in well-known tables. For domain-specific SIDs and custom schema objects, use the `ldapresolver` sub-package:
+
+```go
+import "github.com/f0oster/gontsd/ldapresolver"
+
+client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
     Server:   "ldaps://dc.example.com:636",
     BaseDN:   "DC=example,DC=com",
     BindDN:   "user@example.com",
@@ -93,37 +112,13 @@ if err != nil {
 }
 defer client.Close()
 
-// Create a resolver that checks built-in tables first, then falls back to LDAP
-r, err := resolve.NewLDAPResolver(client)
+r, err := ldapresolver.NewLDAPResolver(client)
 if err != nil {
     log.Fatal(err)
 }
 
-// Parse a security descriptor
-sd, err := gontsd.Parse(rawBytes)
-if err != nil {
-    log.Fatal(err)
-}
-
-// Batch-resolve all SIDs upfront to minimise LDAP round-trips
-resolve.ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
-
-// Display resolved names
-fmt.Println(resolve.FormatSID(sd.OwnerSID, r.SIDs))
-// "BUILTIN\Administrators (S-1-5-32-544)"
-
-for _, ace := range sd.DACL.ACEs {
-    fmt.Println(resolve.FormatSID(ace.SID(), r.SIDs))
-    // "Domain Admins (S-1-5-21-....-512)"
-
-    if guid := ace.ObjectTypeGUID(); guid != "" {
-        fmt.Println(resolve.FormatGUID(guid, r.GUIDs))
-        // "User-Force-Change-Password"
-    }
-}
+sd, err := gontsd.Parse(data, &r.Resolver)
 ```
-
-If you don't have LDAP access, `resolve.NewResolver()` provides the same interface using only the built-in tables. SIDs and GUIDs not in those tables will remain unresolved.
 
 The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, you can implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly.
 
