@@ -93,13 +93,13 @@ func runComparisons(r *gontsd.Resolver) {
 			continue
 		}
 
-		oldSD, err := gontsd.Parse(oldData)
+		oldSD, err := gontsd.Parse(oldData, nil)
 		if err != nil {
 			fmt.Printf("Failed to parse old SD: %v\n", err)
 			continue
 		}
 
-		newSD, err := gontsd.Parse(newData)
+		newSD, err := gontsd.Parse(newData, nil)
 		if err != nil {
 			fmt.Printf("Failed to parse new SD: %v\n", err)
 			continue

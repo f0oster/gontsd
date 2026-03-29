@@ -42,7 +42,7 @@ func TestParse_AddingNewUser(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			data := loadTestData(t, tc.file)
-			sd, err := Parse(data)
+			sd, err := Parse(data, nil)
 			if err != nil {
 				t.Fatalf("Parse() error: %v", err)
 			}
@@ -99,7 +99,7 @@ func TestParse_FlagChanges(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			data := loadTestData(t, tc.file)
-			sd, err := Parse(data)
+			sd, err := Parse(data, nil)
 			if err != nil {
 				t.Fatalf("Parse() error: %v", err)
 			}
@@ -115,7 +115,7 @@ func TestParse_FlagChanges(t *testing.T) {
 
 func TestParse_RootDomain(t *testing.T) {
 	data := loadTestData(t, "root_domain/sd-domainroot.bin")
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestParse_Errors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := Parse(tc.data)
+			_, err := Parse(tc.data, nil)
 			if err == nil {
 				t.Error("Parse() expected error, got nil")
 			}
@@ -166,7 +166,7 @@ func TestParse_MinimalValid(t *testing.T) {
 	// 20-byte descriptor with all offsets = 0 (no owner, group, DACL, SACL)
 	data := make([]byte, 20)
 	data[0] = 1 // revision
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestSecurityDescriptor_String_Nil(t *testing.T) {
 
 func TestCollectSIDs(t *testing.T) {
 	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}

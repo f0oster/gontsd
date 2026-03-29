@@ -8,11 +8,11 @@ func TestCompare_AddingNewUser(t *testing.T) {
 	defaultData := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
 	changeData := loadTestData(t, "adding_new_user/sd-filedomain_change.bin")
 
-	defaultSD, err := Parse(defaultData)
+	defaultSD, err := Parse(defaultData, nil)
 	if err != nil {
 		t.Fatalf("Parse default: %v", err)
 	}
-	changeSD, err := Parse(changeData)
+	changeSD, err := Parse(changeData, nil)
 	if err != nil {
 		t.Fatalf("Parse change: %v", err)
 	}
@@ -50,11 +50,11 @@ func TestCompare_RemovingFlag(t *testing.T) {
 	defaultData := loadTestData(t, "removing_flag/sd-filedomain_default.bin")
 	changeData := loadTestData(t, "removing_flag/sd-filedomain_change.bin")
 
-	defaultSD, err := Parse(defaultData)
+	defaultSD, err := Parse(defaultData, nil)
 	if err != nil {
 		t.Fatalf("Parse default: %v", err)
 	}
-	changeSD, err := Parse(changeData)
+	changeSD, err := Parse(changeData, nil)
 	if err != nil {
 		t.Fatalf("Parse change: %v", err)
 	}
@@ -85,11 +85,11 @@ func TestCompare_AddingFlag(t *testing.T) {
 	defaultData := loadTestData(t, "adding_flag/sd-filedomain_default.bin")
 	changeData := loadTestData(t, "adding_flag/sd-filedomain_change.bin")
 
-	defaultSD, err := Parse(defaultData)
+	defaultSD, err := Parse(defaultData, nil)
 	if err != nil {
 		t.Fatalf("Parse default: %v", err)
 	}
-	changeSD, err := Parse(changeData)
+	changeSD, err := Parse(changeData, nil)
 	if err != nil {
 		t.Fatalf("Parse change: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestCompare_AddingFlag(t *testing.T) {
 
 func TestCompare_Identical(t *testing.T) {
 	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestCompare_NilACLs(t *testing.T) {
 
 func TestCompare_NilOld(t *testing.T) {
 	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestCompare_NilOld(t *testing.T) {
 
 func TestCompare_NilNew(t *testing.T) {
 	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	sd, err := Parse(data)
+	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}

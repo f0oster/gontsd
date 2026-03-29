@@ -75,6 +75,7 @@ type aceBase struct {
 	Header   ACEHeader
 	mask     uint32
 	sid      *SID
+	resolver *Resolver
 }
 
 func (b *aceBase) Type() ACEType                   { return b.Header.AceType }

@@ -57,7 +57,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sd, err := gontsd.Parse(sdBytes)
+	sd, err := gontsd.Parse(sdBytes, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse security descriptor: %v\n", err)
 		os.Exit(1)

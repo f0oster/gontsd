@@ -45,7 +45,7 @@ func TestSIDFromString_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SIDFromString() error: %v", err)
 	}
-	sd, err := gontsd.Parse(buildMinimalSD(raw))
+	sd, err := gontsd.Parse(buildMinimalSD(raw), nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
 	}

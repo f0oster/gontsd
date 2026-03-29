@@ -10,11 +10,26 @@ import (
 type SID struct {
 	Raw    []byte
 	Parsed string
+
+	resolver SIDResolver
 }
 
 func (s *SID) String() string {
 	if s == nil {
 		return "<nil>"
+	}
+	return s.Parsed
+}
+
+// Resolved returns the resolved display name if a resolver was set
+// during parsing, e.g. "BUILTIN\Administrators (S-1-5-32-544)".
+// Falls back to the raw SID string if unresolved.
+func (s *SID) Resolved() string {
+	if s == nil {
+		return "<nil>"
+	}
+	if s.resolver != nil {
+		return FormatSID(s, s.resolver)
 	}
 	return s.Parsed
 }

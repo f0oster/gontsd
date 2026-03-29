@@ -24,15 +24,27 @@ type SecurityDescriptor struct {
 // Parse parses binary ntSecurityDescriptor data into a SecurityDescriptor.
 // The input should be the raw bytes of an NT security descriptor as stored
 // in Active Directory's ntSecurityDescriptor attribute or a file system
-// security descriptor. Returns an error if the data is malformed or too short.
+// security descriptor.
 //
-//	sd, err := gontsd.Parse(rawBytes)
+// If a resolver is provided, all SIDs are batch-resolved and the resolver
+// is stored on each SID and GUID so that [SID.Resolved] and [GUID.Resolved]
+// return human-readable names.
+//
+//	r := gontsd.NewResolver()
+//	sd, err := gontsd.Parse(rawBytes, r)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	fmt.Println(sd.OwnerSID.Parsed) // e.g. "S-1-5-32-544"
-func Parse(data []byte) (*SecurityDescriptor, error) {
-	return parseSecurityDescriptor(data)
+//	fmt.Println(sd.OwnerSID.Resolved()) // e.g. "BUILTIN\Administrators (S-1-5-32-544)"
+func Parse(data []byte, r *Resolver) (*SecurityDescriptor, error) {
+	sd, err := parseSecurityDescriptor(data)
+	if err != nil {
+		return nil, err
+	}
+	if r != nil {
+		sd.resolve(r)
+	}
+	return sd, nil
 }
 
 // ParseToString is a convenience wrapper that parses and returns the
@@ -118,6 +130,36 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 	}
 
 	return sd, nil
+}
+
+func (sd *SecurityDescriptor) resolve(r *Resolver) {
+	// Set resolver on all SIDs
+	setResolver := func(sid *SID) {
+		if sid != nil {
+			sid.resolver = r.SIDs
+		}
+	}
+	setResolver(sd.OwnerSID)
+	setResolver(sd.GroupSID)
+
+	for _, acl := range []*ACL{sd.DACL, sd.SACL} {
+		if acl == nil {
+			continue
+		}
+		for _, ace := range acl.ACEs {
+			setResolver(ace.SID())
+			// Set GUID resolver on object ACE types
+			if guid := ace.ObjectTypeGUID(); guid != nil {
+				guid.resolver = r.GUIDs
+			}
+			if guid := ace.InheritedObjectTypeGUID(); guid != nil {
+				guid.resolver = r.GUIDs
+			}
+		}
+	}
+
+	// Batch-resolve all SIDs upfront
+	ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
 }
 
 // CollectSIDs returns all unique SIDs referenced by this security descriptor,
