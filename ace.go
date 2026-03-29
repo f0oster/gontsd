@@ -118,9 +118,6 @@ func (a *SystemAuditACE) String() string {
 // SystemAuditObjectACE generates an audit record for a specific object type or property.
 type SystemAuditObjectACE struct {
 	aceBase
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
 }
 
 func (a *SystemAuditObjectACE) String() string {
@@ -130,9 +127,6 @@ func (a *SystemAuditObjectACE) String() string {
 // AccessAllowedObjectACE grants access rights to a trustee for a specific object type or property.
 type AccessAllowedObjectACE struct {
 	aceBase
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
 }
 
 func (a *AccessAllowedObjectACE) String() string {
@@ -142,9 +136,6 @@ func (a *AccessAllowedObjectACE) String() string {
 // AccessDeniedObjectACE denies access rights to a trustee for a specific object type or property.
 type AccessDeniedObjectACE struct {
 	aceBase
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
 }
 
 func (a *AccessDeniedObjectACE) String() string {
@@ -179,10 +170,7 @@ func (a *AccessDeniedCallbackACE) String() string {
 // AccessAllowedCallbackObjectACE grants access rights to a specific object type with a conditional expression.
 type AccessAllowedCallbackObjectACE struct {
 	aceBase
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
-	appData             []byte
+	appData []byte
 }
 
 func (a *AccessAllowedCallbackObjectACE) ApplicationData() []byte { return a.appData }
@@ -193,10 +181,7 @@ func (a *AccessAllowedCallbackObjectACE) String() string {
 // AccessDeniedCallbackObjectACE denies access rights to a specific object type with a conditional expression.
 type AccessDeniedCallbackObjectACE struct {
 	aceBase
-	ObjectFlags         uint32
-	ObjectType          [16]byte
-	InheritedObjectType [16]byte
-	appData             []byte
+	appData []byte
 }
 
 func (a *AccessDeniedCallbackObjectACE) ApplicationData() []byte { return a.appData }
@@ -266,16 +251,16 @@ func parseACE(data []byte) (ACE, int, error) {
 		}
 		return &SystemAuditACE{aceBase: a}, int(a.Header.AceSize), nil
 	case AccessAllowedObjectACEType:
-		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
-			return &AccessAllowedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		return parseObjectACE(data, func(base aceBase) ACE {
+			return &AccessAllowedObjectACE{aceBase: base}
 		})
 	case AccessDeniedObjectACEType:
-		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
-			return &AccessDeniedObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		return parseObjectACE(data, func(base aceBase) ACE {
+			return &AccessDeniedObjectACE{aceBase: base}
 		})
 	case SystemAuditObjectACEType:
-		return parseObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte) ACE {
-			return &SystemAuditObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh}
+		return parseObjectACE(data, func(base aceBase) ACE {
+			return &SystemAuditObjectACE{aceBase: base}
 		})
 	case AccessAllowedCallbackACEType:
 		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
@@ -286,12 +271,12 @@ func parseACE(data []byte) (ACE, int, error) {
 			return &AccessDeniedCallbackACE{aceBase: base, appData: appData}
 		})
 	case AccessAllowedCallbackObjectACEType:
-		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
-			return &AccessAllowedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, appData: appData}
+		return parseCallbackObjectACE(data, func(base aceBase, appData []byte) ACE {
+			return &AccessAllowedCallbackObjectACE{aceBase: base, appData: appData}
 		})
 	case AccessDeniedCallbackObjectACEType:
-		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
-			return &AccessDeniedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, appData: appData}
+		return parseCallbackObjectACE(data, func(base aceBase, appData []byte) ACE {
+			return &AccessDeniedCallbackObjectACE{aceBase: base, appData: appData}
 		})
 	default:
 		header, err := parseACEHeader(data)
@@ -352,7 +337,7 @@ func parseSimpleACE(data []byte) (aceBase, error) {
 	return base, err
 }
 
-func parseObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte) ACE) (ACE, int, error) {
+func parseObjectACE(data []byte, build func(aceBase) ACE) (ACE, int, error) {
 	header, err := parseACEHeader(data)
 	if err != nil {
 		return nil, 0, err
@@ -399,7 +384,7 @@ func parseObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte)
 		inheritedObjectType: inheritedObjectTypeGUID(objFlags, inhType),
 	}
 
-	return build(base, objFlags, objType, inhType), int(header.AceSize), nil
+	return build(base), int(header.AceSize), nil
 }
 
 func parseCallbackACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, error) {
@@ -421,7 +406,7 @@ func parseCallbackACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, e
 	return build(base, appData), int(base.Header.AceSize), nil
 }
 
-func parseCallbackObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte, []byte) ACE) (ACE, int, error) {
+func parseCallbackObjectACE(data []byte, build func(aceBase, []byte) ACE) (ACE, int, error) {
 	header, err := parseACEHeader(data)
 	if err != nil {
 		return nil, 0, err
@@ -475,5 +460,5 @@ func parseCallbackObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [
 		copy(appData, data[appDataStart:header.AceSize])
 	}
 
-	return build(base, objFlags, objType, inhType, appData), int(header.AceSize), nil
+	return build(base, appData), int(header.AceSize), nil
 }
