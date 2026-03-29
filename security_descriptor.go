@@ -6,6 +6,7 @@ import (
 )
 
 // SecurityDescriptor represents a Windows NT security descriptor (SECURITY_DESCRIPTOR).
+// See: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/7d4dac05-9cef-4563-a058-f108abecce1d
 type SecurityDescriptor struct {
 	Revision     uint8
 	sbz1         uint8
