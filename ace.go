@@ -18,8 +18,8 @@ const (
 	SystemAuditObjectACEType     ACEType = 0x07
 	AccessAllowedCallbackACEType ACEType = 0x09
 	AccessDeniedCallbackACEType  ACEType = 0x0A
-	AccessAllowedCallbackObjType ACEType = 0x0B
-	AccessDeniedCallbackObjType  ACEType = 0x0C
+	AccessAllowedCallbackObjectACEType ACEType = 0x0B
+	AccessDeniedCallbackObjectACEType ACEType = 0x0C
 )
 
 func (t ACEType) String() string {
@@ -40,9 +40,9 @@ func (t ACEType) String() string {
 		return "AccessAllowedCallback"
 	case AccessDeniedCallbackACEType:
 		return "AccessDeniedCallback"
-	case AccessAllowedCallbackObjType:
+	case AccessAllowedCallbackObjectACEType:
 		return "AccessAllowedCallbackObject"
-	case AccessDeniedCallbackObjType:
+	case AccessDeniedCallbackObjectACEType:
 		return "AccessDeniedCallbackObject"
 	default:
 		return fmt.Sprintf("Unknown(0x%02X)", uint8(t))
@@ -285,11 +285,11 @@ func parseACE(data []byte) (ACE, int, error) {
 		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
 			return &AccessDeniedCallbackACE{aceBase: base, ApplicationData: appData}
 		})
-	case AccessAllowedCallbackObjType:
+	case AccessAllowedCallbackObjectACEType:
 		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
 			return &AccessAllowedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
 		})
-	case AccessDeniedCallbackObjType:
+	case AccessDeniedCallbackObjectACEType:
 		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
 			return &AccessDeniedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
 		})
