@@ -125,6 +125,8 @@ for _, ace := range sd.DACL.ACEs {
 
 If you don't have LDAP access, `resolve.NewResolver()` provides the same interface using only the built-in tables. SIDs and GUIDs not in those tables will remain unresolved.
 
+The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, you can implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly.
+
 ## Examples
 
 Examples in the [examples](./examples) directory:
