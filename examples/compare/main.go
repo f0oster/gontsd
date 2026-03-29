@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/f0oster/gontsd"
-	"github.com/f0oster/gontsd/resolve"
+	"github.com/f0oster/gontsd/ldapresolver"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
+	client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
 		Server:             *ldapServer,
 		BaseDN:             *ldapBaseDN,
 		BindDN:             *ldapBindDN,
@@ -43,7 +43,7 @@ func main() {
 	}
 	defer client.Close()
 
-	r, err := resolve.NewLDAPResolver(client)
+	r, err := ldapresolver.NewLDAPResolver(client)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to set up resolver: %v\n", err)
 		os.Exit(1)
@@ -52,7 +52,7 @@ func main() {
 	runComparisons(&r.Resolver)
 }
 
-func runComparisons(r *resolve.Resolver) {
+func runComparisons(r *gontsd.Resolver) {
 	fmt.Println()
 	fmt.Println("=== Comparisons ===")
 
@@ -106,14 +106,14 @@ func runComparisons(r *resolve.Resolver) {
 		}
 
 		// Batch-resolve all SIDs from both descriptors upfront.
-		resolve.ResolveBatchSIDs(r.SIDs, append(oldSD.CollectSIDs(), newSD.CollectSIDs()...))
+		gontsd.ResolveBatchSIDs(r.SIDs, append(oldSD.CollectSIDs(), newSD.CollectSIDs()...))
 
 		diff := gontsd.Compare(oldSD, newSD)
 		printDiff(diff, r)
 	}
 }
 
-func printDiff(diff *gontsd.DiffResult, r *resolve.Resolver) {
+func printDiff(diff *gontsd.DiffResult, r *gontsd.Resolver) {
 	if diff == nil || !diff.HasChanges() {
 		fmt.Println("No changes detected.")
 		return
@@ -121,14 +121,14 @@ func printDiff(diff *gontsd.DiffResult, r *resolve.Resolver) {
 
 	if diff.OwnerChanged {
 		fmt.Println("\nOwner Changed:")
-		fmt.Printf("  - Old: %s\n", resolve.FormatSID(diff.OldOwner, r.SIDs))
-		fmt.Printf("  + New: %s\n", resolve.FormatSID(diff.NewOwner, r.SIDs))
+		fmt.Printf("  - Old: %s\n", gontsd.FormatSID(diff.OldOwner, r.SIDs))
+		fmt.Printf("  + New: %s\n", gontsd.FormatSID(diff.NewOwner, r.SIDs))
 	}
 
 	if diff.GroupChanged {
 		fmt.Println("\nGroup Changed:")
-		fmt.Printf("  - Old: %s\n", resolve.FormatSID(diff.OldGroup, r.SIDs))
-		fmt.Printf("  + New: %s\n", resolve.FormatSID(diff.NewGroup, r.SIDs))
+		fmt.Printf("  - Old: %s\n", gontsd.FormatSID(diff.OldGroup, r.SIDs))
+		fmt.Printf("  + New: %s\n", gontsd.FormatSID(diff.NewGroup, r.SIDs))
 	}
 
 	if diff.ControlFlagsChanged {
@@ -143,7 +143,7 @@ func printDiff(diff *gontsd.DiffResult, r *resolve.Resolver) {
 	}
 }
 
-func printACLDiff(aclDiff *gontsd.ACLDiff, r *resolve.Resolver) {
+func printACLDiff(aclDiff *gontsd.ACLDiff, r *gontsd.Resolver) {
 	if aclDiff.RevisionChanged {
 		fmt.Printf("  Revision: %d -> %d\n", aclDiff.OldRevision, aclDiff.NewRevision)
 	}
@@ -170,20 +170,20 @@ func printACLDiff(aclDiff *gontsd.ACLDiff, r *resolve.Resolver) {
 	}
 }
 
-func printACE(ace gontsd.ACE, r *resolve.Resolver, indent string) {
+func printACE(ace gontsd.ACE, r *gontsd.Resolver, indent string) {
 	if ace == nil {
 		fmt.Printf("%s<nil>\n", indent)
 		return
 	}
 
 	fmt.Printf("%s%sACE:\n", indent, ace.Type())
-	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(ace.SID(), r.SIDs))
+	fmt.Printf("%s  Trustee: %s\n", indent, gontsd.FormatSID(ace.SID(), r.SIDs))
 	fmt.Printf("%s  Mask:    %s\n", indent, ace.Mask())
 	if objGUID := ace.ObjectTypeGUID(); objGUID != nil {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID.Raw, r.GUIDs))
+		fmt.Printf("%s  ObjectType: %s\n", indent, gontsd.FormatGUID(objGUID.Raw, r.GUIDs))
 	}
 	if inhGUID := ace.InheritedObjectTypeGUID(); inhGUID != nil {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID.Raw, r.GUIDs))
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, gontsd.FormatGUID(inhGUID.Raw, r.GUIDs))
 	}
 	if appData := ace.ApplicationData(); len(appData) > 0 {
 		fmt.Printf("%s  Condition: %d bytes\n", indent, len(appData))
@@ -191,7 +191,7 @@ func printACE(ace gontsd.ACE, r *resolve.Resolver, indent string) {
 }
 
 
-func printModifiedACE(d gontsd.ACEDiff, r *resolve.Resolver, indent string) {
+func printModifiedACE(d gontsd.ACEDiff, r *gontsd.Resolver, indent string) {
 	if d.OldACE == nil || d.NewACE == nil {
 		fmt.Printf("%s<nil>\n", indent)
 		return
@@ -200,14 +200,14 @@ func printModifiedACE(d gontsd.ACEDiff, r *resolve.Resolver, indent string) {
 	added, removed, unchanged := d.CompareAccessRights()
 
 	fmt.Printf("%s%sACE:\n", indent, d.NewACE.Type())
-	fmt.Printf("%s  Trustee: %s\n", indent, resolve.FormatSID(d.NewACE.SID(), r.SIDs))
+	fmt.Printf("%s  Trustee: %s\n", indent, gontsd.FormatSID(d.NewACE.SID(), r.SIDs))
 	fmt.Printf("%s  Mask:    %s -> %s\n", indent, d.OldACE.Mask(), d.NewACE.Mask())
 
 	if objGUID := d.NewACE.ObjectTypeGUID(); objGUID != nil {
-		fmt.Printf("%s  ObjectType: %s\n", indent, resolve.FormatGUID(objGUID.Raw, r.GUIDs))
+		fmt.Printf("%s  ObjectType: %s\n", indent, gontsd.FormatGUID(objGUID.Raw, r.GUIDs))
 	}
 	if inhGUID := d.NewACE.InheritedObjectTypeGUID(); inhGUID != nil {
-		fmt.Printf("%s  InheritedObjectType: %s\n", indent, resolve.FormatGUID(inhGUID.Raw, r.GUIDs))
+		fmt.Printf("%s  InheritedObjectType: %s\n", indent, gontsd.FormatGUID(inhGUID.Raw, r.GUIDs))
 	}
 
 	if len(removed) > 0 {

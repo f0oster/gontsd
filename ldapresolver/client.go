@@ -1,4 +1,4 @@
-package resolve
+package ldapresolver
 
 import (
 	"crypto/tls"

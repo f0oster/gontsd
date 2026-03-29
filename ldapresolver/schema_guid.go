@@ -1,4 +1,4 @@
-package resolve
+package ldapresolver
 
 import (
 	"encoding/hex"
@@ -13,11 +13,11 @@ import (
 // LDAPSchemaGUIDResolver resolves schema GUIDs by querying Active Directory.
 type LDAPSchemaGUIDResolver struct {
 	client *LDAPClient
-	cache  map[string]SchemaGUIDInfo
+	cache  map[string]gontsd.SchemaGUIDInfo
 	mu     sync.RWMutex
 }
 
-var _ SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
+var _ gontsd.SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 
 // NewLDAPSchemaGUIDResolver creates a new LDAP-backed schema GUID resolver.
 // It preloads schema classes and extended rights from AD so that subsequent
@@ -25,7 +25,7 @@ var _ SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, error) {
 	r := &LDAPSchemaGUIDResolver{
 		client: client,
-		cache:  make(map[string]SchemaGUIDInfo),
+		cache:  make(map[string]gontsd.SchemaGUIDInfo),
 	}
 
 	if err := r.preloadSchema(); err != nil {
@@ -39,8 +39,8 @@ func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, err
 	return r, nil
 }
 
-func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
-	normalizedGUID := NormalizeGUID(guid)
+func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*gontsd.SchemaGUIDInfo, error) {
+	normalizedGUID := gontsd.NormalizeGUID(guid)
 
 	r.mu.RLock()
 	if info, ok := r.cache[normalizedGUID]; ok {
@@ -88,22 +88,22 @@ func (r *LDAPSchemaGUIDResolver) preloadSchema() error {
 		if err != nil {
 			continue
 		}
-		normalizedGUID := NormalizeGUID(guidStr)
+		normalizedGUID := gontsd.NormalizeGUID(guidStr)
 
 		name := entry.GetAttributeValue("ldapDisplayName")
 		if name == "" {
 			name = entry.GetAttributeValue("cn")
 		}
 
-		guidType := GUIDTypeAttribute
+		guidType := gontsd.GUIDTypeAttribute
 		for _, oc := range entry.GetAttributeValues("objectClass") {
 			if oc == "classSchema" {
-				guidType = GUIDTypeClass
+				guidType = gontsd.GUIDTypeClass
 				break
 			}
 		}
 
-		r.cache[normalizedGUID] = SchemaGUIDInfo{
+		r.cache[normalizedGUID] = gontsd.SchemaGUIDInfo{
 			Name: name,
 			Type: guidType,
 			GUID: normalizedGUID,
@@ -140,7 +140,7 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 			continue
 		}
 
-		normalizedGUID := NormalizeGUID(rightsGuid)
+		normalizedGUID := gontsd.NormalizeGUID(rightsGuid)
 		name := entry.GetAttributeValue("displayName")
 		if name == "" {
 			name = entry.GetAttributeValue("cn")
@@ -149,17 +149,17 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 		guidType := determineExtendedRightType(entry.GetAttributeValue("validAccesses"))
 
 		appliesToGUIDs := entry.GetAttributeValues("appliesTo")
-		var appliesTo []AppliesToEntry
+		var appliesTo []gontsd.AppliesToEntry
 		for _, classGUID := range appliesToGUIDs {
-			normalized := NormalizeGUID(classGUID)
-			ae := AppliesToEntry{GUID: normalized}
+			normalized := gontsd.NormalizeGUID(classGUID)
+			ae := gontsd.AppliesToEntry{GUID: normalized}
 			if cached, ok := r.cache[normalized]; ok {
 				ae.Name = cached.Name
 			}
 			appliesTo = append(appliesTo, ae)
 		}
 
-		r.cache[normalizedGUID] = SchemaGUIDInfo{
+		r.cache[normalizedGUID] = gontsd.SchemaGUIDInfo{
 			Name:      name,
 			Type:      guidType,
 			GUID:      normalizedGUID,
@@ -170,14 +170,12 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 	return nil
 }
 
-
-func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error) {
+func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (gontsd.SchemaGUIDInfo, error) {
 	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
 
-	// schemaIDGUID is stored as binary, need to convert GUID string to binary escape format
 	binaryFilter, err := guidStringToBinaryFilter(guid)
 	if err != nil {
-		return SchemaGUIDInfo{}, fmt.Errorf("invalid GUID %q: %w", guid, err)
+		return gontsd.SchemaGUIDInfo{}, fmt.Errorf("invalid GUID %q: %w", guid, err)
 	}
 
 	searchRequest := ldap.NewSearchRequest(
@@ -192,11 +190,11 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 
 	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
-		return SchemaGUIDInfo{}, fmt.Errorf("LDAP schema search failed: %w", err)
+		return gontsd.SchemaGUIDInfo{}, fmt.Errorf("LDAP schema search failed: %w", err)
 	}
 
 	if len(sr.Entries) == 0 {
-		return SchemaGUIDInfo{}, ErrSchemaGUIDNotFound
+		return gontsd.SchemaGUIDInfo{}, gontsd.ErrSchemaGUIDNotFound
 	}
 
 	entry := sr.Entries[0]
@@ -205,37 +203,37 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error
 		name = entry.GetAttributeValue("cn")
 	}
 
-	guidType := GUIDTypeAttribute
+	guidType := gontsd.GUIDTypeAttribute
 	for _, oc := range entry.GetAttributeValues("objectClass") {
 		if oc == "classSchema" {
-			guidType = GUIDTypeClass
+			guidType = gontsd.GUIDTypeClass
 			break
 		}
 	}
 
-	return SchemaGUIDInfo{
+	return gontsd.SchemaGUIDInfo{
 		Name: name,
 		Type: guidType,
 		GUID: guid,
 	}, nil
 }
 
-func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info SchemaGUIDInfo) {
+func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info gontsd.SchemaGUIDInfo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cache[guid] = info
 }
 
-func determineExtendedRightType(validAccesses string) GUIDType {
+func determineExtendedRightType(validAccesses string) gontsd.GUIDType {
 	switch validAccesses {
 	case "256":
-		return GUIDTypeExtendedRight
+		return gontsd.GUIDTypeExtendedRight
 	case "8":
-		return GUIDTypeValidatedWrite
+		return gontsd.GUIDTypeValidatedWrite
 	case "48":
-		return GUIDTypePropertySet
+		return gontsd.GUIDTypePropertySet
 	default:
-		return GUIDTypeExtendedRight
+		return gontsd.GUIDTypeExtendedRight
 	}
 }
 
@@ -264,7 +262,7 @@ func guidStringToBinaryFilter(guid string) (string, error) {
 func (r *LDAPSchemaGUIDResolver) ClearCache() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.cache = make(map[string]SchemaGUIDInfo)
+	r.cache = make(map[string]gontsd.SchemaGUIDInfo)
 }
 
 func (r *LDAPSchemaGUIDResolver) CacheSize() int {

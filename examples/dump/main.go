@@ -16,7 +16,7 @@ import (
 	"os"
 
 	"github.com/f0oster/gontsd"
-	"github.com/f0oster/gontsd/resolve"
+	"github.com/f0oster/gontsd/ldapresolver"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -37,7 +37,7 @@ func main() {
 
 	targetDN := *objectDN
 
-	client, err := resolve.NewLDAPClient(resolve.LDAPConfig{
+	client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
 		Server:             *ldapServer,
 		BaseDN:             *ldapBaseDN,
 		BindDN:             *ldapBindDN,
@@ -63,24 +63,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	r, err := resolve.NewLDAPResolver(client)
+	r, err := ldapresolver.NewLDAPResolver(client)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to set up resolver: %v\n", err)
 		os.Exit(1)
 	}
 
-	resolve.ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
+	gontsd.ResolveBatchSIDs(r.SIDs, sd.CollectSIDs())
 
 	fmt.Printf("Object:  %s\n", targetDN)
-	fmt.Printf("Owner:   %s\n", resolve.FormatSID(sd.OwnerSID, r.SIDs))
-	fmt.Printf("Group:   %s\n", resolve.FormatSID(sd.GroupSID, r.SIDs))
+	fmt.Printf("Owner:   %s\n", gontsd.FormatSID(sd.OwnerSID, r.SIDs))
+	fmt.Printf("Group:   %s\n", gontsd.FormatSID(sd.GroupSID, r.SIDs))
 	fmt.Printf("Control: %s\n", sd.ControlFlags)
 
 	printACL("DACL", sd.DACL, r)
 	printACL("SACL", sd.SACL, r)
 }
 
-func fetchSecurityDescriptor(client *resolve.LDAPClient, dn string) ([]byte, error) {
+func fetchSecurityDescriptor(client *ldapresolver.LDAPClient, dn string) ([]byte, error) {
 	sdFlagsControl := ldap.NewControlMicrosoftSDFlags()
 	sdFlagsControl.ControlValue = 0x07 // owner + group + DACL
 
@@ -109,20 +109,20 @@ func fetchSecurityDescriptor(client *resolve.LDAPClient, dn string) ([]byte, err
 	return sdBytes, nil
 }
 
-func printACL(name string, acl *gontsd.ACL, r *resolve.LDAPResolver) {
+func printACL(name string, acl *gontsd.ACL, r *ldapresolver.LDAPResolver) {
 	if acl == nil {
 		return
 	}
 	fmt.Printf("\n%s (%d ACEs):\n", name, len(acl.ACEs))
 	for i, ace := range acl.ACEs {
 		fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
-		fmt.Printf("      Trustee: %s\n", resolve.FormatSID(ace.SID(), r.SIDs))
+		fmt.Printf("      Trustee: %s\n", gontsd.FormatSID(ace.SID(), r.SIDs))
 		fmt.Printf("      Mask:    %s\n", ace.Mask())
 		if guid := ace.ObjectTypeGUID(); guid != nil {
-			fmt.Printf("      ObjectType: %s\n", resolve.FormatGUID(guid.Raw, r.GUIDs))
+			fmt.Printf("      ObjectType: %s\n", gontsd.FormatGUID(guid.Raw, r.GUIDs))
 		}
 		if guid := ace.InheritedObjectTypeGUID(); guid != nil {
-			fmt.Printf("      InheritedObjectType: %s\n", resolve.FormatGUID(guid.Raw, r.GUIDs))
+			fmt.Printf("      InheritedObjectType: %s\n", gontsd.FormatGUID(guid.Raw, r.GUIDs))
 		}
 		if appData := ace.ApplicationData(); len(appData) > 0 {
 			fmt.Printf("      Condition: %d bytes\n", len(appData))
