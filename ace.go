@@ -62,32 +62,29 @@ type ACE interface {
 	Type() ACEType
 	Size() uint16
 	String() string
-	GetSID() *SID
-	GetMask() uint32
-	GetAceFlags() uint8
-	GetAccessRights() []string
-	GetApplicationData() []byte
-	GetObjectTypeGUID() string
-	GetInheritedObjectTypeGUID() string
+	SID() *SID
+	Mask() AccessMask
+	AceFlags() ACEFlags
+	ApplicationData() []byte
+	ObjectTypeGUID() string
+	InheritedObjectTypeGUID() string
 }
 
 // aceBase contains the fields common to every ACE type.
 type aceBase struct {
-	Header       ACEHeader
-	Mask         uint32
-	SID          *SID
-	AccessRights []string
+	Header   ACEHeader
+	mask     uint32
+	sid      *SID
 }
 
-func (b *aceBase) Type() ACEType              { return b.Header.AceType }
-func (b *aceBase) Size() uint16               { return b.Header.AceSize }
-func (b *aceBase) GetSID() *SID               { return b.SID }
-func (b *aceBase) GetMask() uint32            { return b.Mask }
-func (b *aceBase) GetAceFlags() uint8         { return b.Header.AceFlags }
-func (b *aceBase) GetAccessRights() []string          { return b.AccessRights }
-func (b *aceBase) GetApplicationData() []byte          { return nil }
-func (b *aceBase) GetObjectTypeGUID() string          { return "" }
-func (b *aceBase) GetInheritedObjectTypeGUID() string { return "" }
+func (b *aceBase) Type() ACEType                   { return b.Header.AceType }
+func (b *aceBase) Size() uint16                    { return b.Header.AceSize }
+func (b *aceBase) SID() *SID                       { return b.sid }
+func (b *aceBase) Mask() AccessMask                { return AccessMask(b.mask) }
+func (b *aceBase) AceFlags() ACEFlags              { return ACEFlags(b.Header.AceFlags) }
+func (b *aceBase) ApplicationData() []byte         { return nil }
+func (b *aceBase) ObjectTypeGUID() string          { return "" }
+func (b *aceBase) InheritedObjectTypeGUID() string { return "" }
 
 // AccessAllowedACE grants access rights to a trustee.
 type AccessAllowedACE struct {
@@ -95,7 +92,7 @@ type AccessAllowedACE struct {
 }
 
 func (a *AccessAllowedACE) String() string {
-	return fmt.Sprintf("AccessAllowedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
+	return fmt.Sprintf("AccessAllowedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
 }
 
 // AccessDeniedACE denies access rights to a trustee.
@@ -104,7 +101,7 @@ type AccessDeniedACE struct {
 }
 
 func (a *AccessDeniedACE) String() string {
-	return fmt.Sprintf("AccessDeniedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
+	return fmt.Sprintf("AccessDeniedACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
 }
 
 // AccessAllowedObjectACE grants access rights to a trustee for a specific object type or property.
@@ -115,16 +112,16 @@ type AccessAllowedObjectACE struct {
 	InheritedObjectType [16]byte
 }
 
-func (a *AccessAllowedObjectACE) GetObjectTypeGUID() string {
+func (a *AccessAllowedObjectACE) ObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessAllowedObjectACE) GetInheritedObjectTypeGUID() string {
+func (a *AccessAllowedObjectACE) InheritedObjectTypeGUID() string {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessAllowedObjectACE) String() string {
-	return fmt.Sprintf("AccessAllowedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
+	return fmt.Sprintf("AccessAllowedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
 }
 
 // AccessDeniedObjectACE denies access rights to a trustee for a specific object type or property.
@@ -135,39 +132,41 @@ type AccessDeniedObjectACE struct {
 	InheritedObjectType [16]byte
 }
 
-func (a *AccessDeniedObjectACE) GetObjectTypeGUID() string {
+func (a *AccessDeniedObjectACE) ObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessDeniedObjectACE) GetInheritedObjectTypeGUID() string {
+func (a *AccessDeniedObjectACE) InheritedObjectTypeGUID() string {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessDeniedObjectACE) String() string {
-	return fmt.Sprintf("AccessDeniedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.Mask, a.SID, a.AccessRights)
+	return fmt.Sprintf("AccessDeniedObjectACE { Mask: 0x%08X, SID: %s, AccessRights: %v }", a.mask, a.sid, a.Mask().Names())
 }
 
 // AccessAllowedCallbackACE grants access rights with a conditional expression.
 // See MS-DTYP 2.4.4.17 for the conditional expression format.
+//
+// TODO: remove ApplicationData() from ACE interface; access via type assertion instead.
 type AccessAllowedCallbackACE struct {
 	aceBase
-	ApplicationData []byte
+	appData []byte
 }
 
-func (a *AccessAllowedCallbackACE) GetApplicationData() []byte { return a.ApplicationData }
+func (a *AccessAllowedCallbackACE) ApplicationData() []byte { return a.appData }
 func (a *AccessAllowedCallbackACE) String() string {
-	return fmt.Sprintf("AccessAllowedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
+	return fmt.Sprintf("AccessAllowedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.mask, a.sid, len(a.appData))
 }
 
 // AccessDeniedCallbackACE denies access rights with a conditional expression.
 type AccessDeniedCallbackACE struct {
 	aceBase
-	ApplicationData []byte
+	appData []byte
 }
 
-func (a *AccessDeniedCallbackACE) GetApplicationData() []byte { return a.ApplicationData }
+func (a *AccessDeniedCallbackACE) ApplicationData() []byte { return a.appData }
 func (a *AccessDeniedCallbackACE) String() string {
-	return fmt.Sprintf("AccessDeniedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
+	return fmt.Sprintf("AccessDeniedCallbackACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.mask, a.sid, len(a.appData))
 }
 
 // AccessAllowedCallbackObjectACE grants access rights to a specific object type with a conditional expression.
@@ -176,20 +175,20 @@ type AccessAllowedCallbackObjectACE struct {
 	ObjectFlags         uint32
 	ObjectType          [16]byte
 	InheritedObjectType [16]byte
-	ApplicationData     []byte
+	appData             []byte
 }
 
-func (a *AccessAllowedCallbackObjectACE) GetApplicationData() []byte { return a.ApplicationData }
-func (a *AccessAllowedCallbackObjectACE) GetObjectTypeGUID() string {
+func (a *AccessAllowedCallbackObjectACE) ApplicationData() []byte { return a.appData }
+func (a *AccessAllowedCallbackObjectACE) ObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessAllowedCallbackObjectACE) GetInheritedObjectTypeGUID() string {
+func (a *AccessAllowedCallbackObjectACE) InheritedObjectTypeGUID() string {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessAllowedCallbackObjectACE) String() string {
-	return fmt.Sprintf("AccessAllowedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
+	return fmt.Sprintf("AccessAllowedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.mask, a.sid, len(a.appData))
 }
 
 // AccessDeniedCallbackObjectACE denies access rights to a specific object type with a conditional expression.
@@ -198,20 +197,20 @@ type AccessDeniedCallbackObjectACE struct {
 	ObjectFlags         uint32
 	ObjectType          [16]byte
 	InheritedObjectType [16]byte
-	ApplicationData     []byte
+	appData             []byte
 }
 
-func (a *AccessDeniedCallbackObjectACE) GetApplicationData() []byte { return a.ApplicationData }
-func (a *AccessDeniedCallbackObjectACE) GetObjectTypeGUID() string {
+func (a *AccessDeniedCallbackObjectACE) ApplicationData() []byte { return a.appData }
+func (a *AccessDeniedCallbackObjectACE) ObjectTypeGUID() string {
 	return objectTypeGUID(a.ObjectFlags, a.ObjectType)
 }
 
-func (a *AccessDeniedCallbackObjectACE) GetInheritedObjectTypeGUID() string {
+func (a *AccessDeniedCallbackObjectACE) InheritedObjectTypeGUID() string {
 	return inheritedObjectTypeGUID(a.ObjectFlags, a.InheritedObjectType)
 }
 
 func (a *AccessDeniedCallbackObjectACE) String() string {
-	return fmt.Sprintf("AccessDeniedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.Mask, a.SID, len(a.ApplicationData))
+	return fmt.Sprintf("AccessDeniedCallbackObjectACE { Mask: 0x%08X, SID: %s, Condition: %d bytes }", a.mask, a.sid, len(a.appData))
 }
 
 // RawACE represents an ACE type that is not explicitly supported.
@@ -222,7 +221,7 @@ type RawACE struct {
 }
 
 func (a *RawACE) String() string {
-	return fmt.Sprintf("RawACE { Type: 0x%02X, Size: %d }", a.Header.AceType, a.Header.AceSize)
+	return fmt.Sprintf("RawACE { Type: 0x%02X, Size: %d }", uint8(a.Header.AceType), a.Header.AceSize)
 }
 
 // GUID helpers for object ACE types.
@@ -279,19 +278,19 @@ func parseACE(data []byte) (ACE, int, error) {
 		})
 	case AccessAllowedCallbackACEType:
 		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
-			return &AccessAllowedCallbackACE{aceBase: base, ApplicationData: appData}
+			return &AccessAllowedCallbackACE{aceBase: base, appData: appData}
 		})
 	case AccessDeniedCallbackACEType:
 		return parseCallbackACE(data, func(base aceBase, appData []byte) ACE {
-			return &AccessDeniedCallbackACE{aceBase: base, ApplicationData: appData}
+			return &AccessDeniedCallbackACE{aceBase: base, appData: appData}
 		})
 	case AccessAllowedCallbackObjectACEType:
 		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
-			return &AccessAllowedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
+			return &AccessAllowedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, appData: appData}
 		})
 	case AccessDeniedCallbackObjectACEType:
 		return parseCallbackObjectACE(data, func(base aceBase, flags uint32, obj, inh [16]byte, appData []byte) ACE {
-			return &AccessDeniedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, ApplicationData: appData}
+			return &AccessDeniedCallbackObjectACE{aceBase: base, ObjectFlags: flags, ObjectType: obj, InheritedObjectType: inh, appData: appData}
 		})
 	default:
 		header, err := parseACEHeader(data)
@@ -306,8 +305,8 @@ func parseACE(data []byte) (ACE, int, error) {
 
 		// Try to parse common fields (mask + SID) since most unsupported
 		// ACE types share the standard layout.
-		base, _, err := parseAceBase(data)
-		if err != nil {
+		base, _, parseErr := parseAceBase(data)
+		if parseErr != nil {
 			base = aceBase{Header: header}
 		}
 		return &RawACE{aceBase: base, RawData: raw}, int(header.AceSize), nil
@@ -341,10 +340,9 @@ func parseAceBase(data []byte) (aceBase, int, error) {
 		return aceBase{}, 0, err
 	}
 	return aceBase{
-		Header:       header,
-		Mask:         mask,
-		SID:          sid,
-		AccessRights: CheckFlags(mask),
+		Header: header,
+		mask:   mask,
+		sid:    sid,
 	}, sidLen, nil
 }
 
@@ -393,10 +391,9 @@ func parseObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [16]byte)
 	}
 
 	base := aceBase{
-		Header:       header,
-		Mask:         mask,
-		SID:          sid,
-		AccessRights: CheckFlags(mask),
+		Header: header,
+		mask:   mask,
+		sid:    sid,
 	}
 
 	return build(base, objFlags, objType, inhType), int(header.AceSize), nil
@@ -461,10 +458,9 @@ func parseCallbackObjectACE(data []byte, build func(aceBase, uint32, [16]byte, [
 	}
 
 	base := aceBase{
-		Header:       header,
-		Mask:         mask,
-		SID:          sid,
-		AccessRights: CheckFlags(mask),
+		Header: header,
+		mask:   mask,
+		sid:    sid,
 	}
 
 	appDataStart := offset + sidLen

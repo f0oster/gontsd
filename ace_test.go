@@ -30,11 +30,11 @@ func TestParseACE_AccessAllowed(t *testing.T) {
 	if ace.Type() != AccessAllowedACEType {
 		t.Errorf("Type() = 0x%02X, want 0x%02X", ace.Type(), AccessAllowedACEType)
 	}
-	if ace.GetMask() != 0x001F01FF {
-		t.Errorf("GetMask() = 0x%08X, want 0x001F01FF", ace.GetMask())
+	if ace.Mask() != 0x001F01FF {
+		t.Errorf("Mask() = %s, want 0x001F01FF", ace.Mask())
 	}
-	if ace.GetSID() == nil || ace.GetSID().Parsed != "S-1-5-18" {
-		t.Errorf("GetSID() = %v, want S-1-5-18", ace.GetSID())
+	if ace.SID() == nil || ace.SID().Parsed != "S-1-5-18" {
+		t.Errorf("GetSID() = %v, want S-1-5-18", ace.SID())
 	}
 	if _, ok := ace.(*AccessAllowedACE); !ok {
 		t.Errorf("expected *AccessAllowedACE, got %T", ace)
@@ -76,8 +76,8 @@ func TestParseACE_UnsupportedType(t *testing.T) {
 		t.Errorf("aceLen = %d, want %d", aceLen, len(data))
 	}
 	// RawACE now parses common fields when possible
-	if raw.GetSID() == nil || raw.GetSID().Parsed != "S-1-5-18" {
-		t.Errorf("RawACE.GetSID() = %v, want S-1-5-18", raw.GetSID())
+	if raw.SID() == nil || raw.SID().Parsed != "S-1-5-18" {
+		t.Errorf("RawACE.SID() = %v, want S-1-5-18", raw.SID())
 	}
 }
 
@@ -96,10 +96,10 @@ func TestACE_NonObjectGUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseACE() error: %v", err)
 	}
-	if g := ace.GetObjectTypeGUID(); g != "" {
+	if g := ace.ObjectTypeGUID(); g != "" {
 		t.Errorf("GetObjectTypeGUID() = %q, want empty for non-object ACE", g)
 	}
-	if g := ace.GetInheritedObjectTypeGUID(); g != "" {
+	if g := ace.InheritedObjectTypeGUID(); g != "" {
 		t.Errorf("GetInheritedObjectTypeGUID() = %q, want empty for non-object ACE", g)
 	}
 }

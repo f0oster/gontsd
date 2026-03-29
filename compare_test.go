@@ -36,8 +36,8 @@ func TestCompare_AddingNewUser(t *testing.T) {
 	for _, d := range diff.DACLDiff.ACEDiffs {
 		if d.Type.Has(DiffAdded) {
 			foundAdded = true
-			if d.NewACE.GetSID().Parsed != "S-1-5-21-75115020-4145467708-3593911600-1627" {
-				t.Errorf("added ACE SID = %s, want ...1627", d.NewACE.GetSID().Parsed)
+			if d.NewACE.SID().Parsed != "S-1-5-21-75115020-4145467708-3593911600-1627" {
+				t.Errorf("added ACE SID = %s, want ...1627", d.NewACE.SID().Parsed)
 			}
 		}
 	}
@@ -71,7 +71,7 @@ func TestCompare_RemovingFlag(t *testing.T) {
 	for _, d := range diff.DACLDiff.ACEDiffs {
 		if d.Type.Has(DiffModified) {
 			foundModified = true
-			if d.OldACE.GetMask() == d.NewACE.GetMask() {
+			if d.OldACE.Mask() == d.NewACE.Mask() {
 				t.Error("modified ACE should have different masks")
 			}
 		}

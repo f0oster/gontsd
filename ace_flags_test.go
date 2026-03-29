@@ -2,40 +2,52 @@ package gontsd
 
 import "testing"
 
-func TestCheckAceFlags_Single(t *testing.T) {
-	flags := CheckAceFlags(INHERITED_ACE)
-	if len(flags) != 1 || flags[0] != "INHERITED_ACE" {
-		t.Errorf("CheckAceFlags(INHERITED_ACE) = %v, want [INHERITED_ACE]", flags)
+func TestACEFlags_Names_Single(t *testing.T) {
+	names := INHERITED_ACE.Names()
+	if len(names) != 1 || names[0] != "INHERITED_ACE" {
+		t.Errorf("Names() = %v, want [INHERITED_ACE]", names)
 	}
 }
 
-func TestCheckAceFlags_Multiple(t *testing.T) {
-	flags := CheckAceFlags(OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERITED_ACE)
-	if len(flags) != 3 {
-		t.Fatalf("CheckAceFlags() returned %d flags, want 3", len(flags))
+func TestACEFlags_Names_Multiple(t *testing.T) {
+	flags := OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE | INHERITED_ACE
+	names := flags.Names()
+	if len(names) != 3 {
+		t.Fatalf("Names() returned %d flags, want 3", len(names))
 	}
 	want := map[string]bool{
 		"OBJECT_INHERIT_ACE":    true,
 		"CONTAINER_INHERIT_ACE": true,
 		"INHERITED_ACE":         true,
 	}
-	for _, f := range flags {
+	for _, f := range names {
 		if !want[f] {
 			t.Errorf("unexpected flag: %s", f)
 		}
 	}
 }
 
-func TestCheckAceFlags_Zero(t *testing.T) {
-	flags := CheckAceFlags(0)
-	if len(flags) != 0 {
-		t.Errorf("CheckAceFlags(0) = %v, want empty", flags)
+func TestACEFlags_Names_Zero(t *testing.T) {
+	names := ACEFlags(0).Names()
+	if len(names) != 0 {
+		t.Errorf("Names() = %v, want empty", names)
 	}
 }
 
-func TestCheckAceFlags_AuditFlags(t *testing.T) {
-	flags := CheckAceFlags(SUCCESSFUL_ACCESS_ACE_FLAG | FAILED_ACCESS_ACE_FLAG)
-	if len(flags) != 2 {
-		t.Fatalf("CheckAceFlags() returned %d flags, want 2", len(flags))
+func TestACEFlags_Names_AuditFlags(t *testing.T) {
+	flags := SUCCESSFUL_ACCESS_ACE_FLAG | FAILED_ACCESS_ACE_FLAG
+	names := flags.Names()
+	if len(names) != 2 {
+		t.Fatalf("Names() returned %d flags, want 2", len(names))
+	}
+}
+
+func TestACEFlags_Has(t *testing.T) {
+	flags := OBJECT_INHERIT_ACE | INHERITED_ACE
+	if !flags.Has(INHERITED_ACE) {
+		t.Error("Has(INHERITED_ACE) should be true")
+	}
+	if flags.Has(CONTAINER_INHERIT_ACE) {
+		t.Error("Has(CONTAINER_INHERIT_ACE) should be false")
 	}
 }

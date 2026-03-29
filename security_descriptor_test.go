@@ -72,7 +72,7 @@ func TestParse_FlagChanges(t *testing.T) {
 	tests := []struct {
 		name     string
 		file     string
-		ace0Mask uint32
+		ace0Mask AccessMask
 	}{
 		{
 			name:     "removing_flag/default",
@@ -106,8 +106,8 @@ func TestParse_FlagChanges(t *testing.T) {
 			if sd.DACL == nil || len(sd.DACL.ACEs) == 0 {
 				t.Fatal("DACL is nil or empty")
 			}
-			if sd.DACL.ACEs[0].GetMask() != tc.ace0Mask {
-				t.Errorf("ACE[0] mask = 0x%08X, want 0x%08X", sd.DACL.ACEs[0].GetMask(), tc.ace0Mask)
+			if sd.DACL.ACEs[0].Mask() != tc.ace0Mask {
+				t.Errorf("ACE[0] mask = %s, want %s", sd.DACL.ACEs[0].Mask(), tc.ace0Mask)
 			}
 		})
 	}

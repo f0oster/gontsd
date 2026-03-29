@@ -2,44 +2,69 @@ package gontsd
 
 import "testing"
 
-func TestCheckFlags_SingleFlag(t *testing.T) {
-	flags := CheckFlags(RIGHT_DS_CREATE_CHILD)
-	if len(flags) != 1 {
-		t.Fatalf("CheckFlags(RIGHT_DS_CREATE_CHILD) returned %d flags, want 1", len(flags))
+func TestAccessMask_Names_Single(t *testing.T) {
+	names := RIGHT_DS_CREATE_CHILD.Names()
+	if len(names) != 1 {
+		t.Fatalf("Names() returned %d flags, want 1", len(names))
 	}
-	if flags[0] != "RIGHT_DS_CREATE_CHILD" {
-		t.Errorf("CheckFlags(RIGHT_DS_CREATE_CHILD) = %v, want [RIGHT_DS_CREATE_CHILD]", flags)
+	if names[0] != "RIGHT_DS_CREATE_CHILD" {
+		t.Errorf("Names() = %v, want [RIGHT_DS_CREATE_CHILD]", names)
 	}
 }
 
-func TestCheckFlags_MultipleFlags(t *testing.T) {
-	mask := uint32(RIGHT_DS_READ_PROPERTY | RIGHT_DS_WRITE_PROPERTY)
-	flags := CheckFlags(mask)
-	if len(flags) != 2 {
-		t.Fatalf("CheckFlags(0x%X) returned %d flags, want 2", mask, len(flags))
+func TestAccessMask_Names_Multiple(t *testing.T) {
+	mask := RIGHT_DS_READ_PROPERTY | RIGHT_DS_WRITE_PROPERTY
+	names := mask.Names()
+	if len(names) != 2 {
+		t.Fatalf("Names() returned %d flags, want 2", len(names))
 	}
 	found := make(map[string]bool)
-	for _, f := range flags {
+	for _, f := range names {
 		found[f] = true
 	}
 	if !found["RIGHT_DS_READ_PROPERTY"] || !found["RIGHT_DS_WRITE_PROPERTY"] {
-		t.Errorf("CheckFlags(0x%X) = %v, want RIGHT_DS_READ_PROPERTY and RIGHT_DS_WRITE_PROPERTY", mask, flags)
+		t.Errorf("Names() = %v, want RIGHT_DS_READ_PROPERTY and RIGHT_DS_WRITE_PROPERTY", names)
 	}
 }
 
-func TestCheckFlags_Zero(t *testing.T) {
-	flags := CheckFlags(0)
-	if len(flags) != 0 {
-		t.Errorf("CheckFlags(0) = %v, want empty", flags)
+func TestAccessMask_Names_Zero(t *testing.T) {
+	names := AccessMask(0).Names()
+	if len(names) != 0 {
+		t.Errorf("Names() = %v, want empty", names)
 	}
 }
 
-func TestCheckFlags_GenericAll(t *testing.T) {
-	flags := CheckFlags(RIGHT_GENERIC_ALL)
-	if len(flags) != 1 {
-		t.Fatalf("CheckFlags(RIGHT_GENERIC_ALL) returned %d flags, want 1", len(flags))
+func TestAccessMask_Names_GenericAll(t *testing.T) {
+	names := RIGHT_GENERIC_ALL.Names()
+	if len(names) != 1 {
+		t.Fatalf("Names() returned %d flags, want 1", len(names))
 	}
-	if flags[0] != "RIGHT_GENERIC_ALL" {
-		t.Errorf("CheckFlags(RIGHT_GENERIC_ALL) = %v, want [RIGHT_GENERIC_ALL]", flags)
+	if names[0] != "RIGHT_GENERIC_ALL" {
+		t.Errorf("Names() = %v, want [RIGHT_GENERIC_ALL]", names)
+	}
+}
+
+func TestAccessMask_Has(t *testing.T) {
+	mask := RIGHT_DS_READ_PROPERTY | RIGHT_DS_WRITE_PROPERTY
+	if !mask.Has(RIGHT_DS_READ_PROPERTY) {
+		t.Error("Has(RIGHT_DS_READ_PROPERTY) should be true")
+	}
+	if mask.Has(RIGHT_DELETE) {
+		t.Error("Has(RIGHT_DELETE) should be false")
+	}
+}
+
+func TestAccessMask_String(t *testing.T) {
+	mask := RIGHT_DS_READ_PROPERTY | RIGHT_DS_WRITE_PROPERTY
+	s := mask.String()
+	if s != "RIGHT_DS_READ_PROPERTY|RIGHT_DS_WRITE_PROPERTY" {
+		t.Errorf("String() = %q, want %q", s, "RIGHT_DS_READ_PROPERTY|RIGHT_DS_WRITE_PROPERTY")
+	}
+}
+
+func TestAccessMask_String_Zero(t *testing.T) {
+	s := AccessMask(0).String()
+	if s != "0x00000000" {
+		t.Errorf("String() = %q, want %q", s, "0x00000000")
 	}
 }

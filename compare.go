@@ -61,24 +61,27 @@ func (d ACEDiff) CompareAccessRights() (added, removed, unchanged []string) {
 		return nil, nil, nil
 	}
 
+	oldNames := d.OldACE.Mask().Names()
+	newNames := d.NewACE.Mask().Names()
+
 	oldSet := make(map[string]bool)
 	newSet := make(map[string]bool)
 
-	for _, f := range d.OldACE.GetAccessRights() {
+	for _, f := range oldNames {
 		oldSet[f] = true
 	}
-	for _, f := range d.NewACE.GetAccessRights() {
+	for _, f := range newNames {
 		newSet[f] = true
 	}
 
-	for _, f := range d.OldACE.GetAccessRights() {
+	for _, f := range oldNames {
 		if !newSet[f] {
 			removed = append(removed, f)
 		} else {
 			unchanged = append(unchanged, f)
 		}
 	}
-	for _, f := range d.NewACE.GetAccessRights() {
+	for _, f := range newNames {
 		if !oldSet[f] {
 			added = append(added, f)
 		}
@@ -109,8 +112,8 @@ type DiffResult struct {
 	SACLDiff *ACLDiff // nil if SACL unchanged
 
 	ControlFlagsChanged bool
-	OldControlFlags     uint16
-	NewControlFlags     uint16
+	OldControlFlags     ControlFlags
+	NewControlFlags     ControlFlags
 }
 
 // HasChanges returns true if any differences were detected.
@@ -131,7 +134,7 @@ func (d *DiffResult) HasChanges() bool {
 //	if diff.HasChanges() {
 //	    for _, d := range diff.DACLDiff.ACEDiffs {
 //	        if d.Type.Has(gontsd.DiffModified) {
-//	            fmt.Printf("modified: %s\n", d.NewACE.GetSID().Parsed)
+//	            fmt.Printf("modified: %s\n", d.NewACE.SID().Parsed)
 //	        }
 //	    }
 //	}
@@ -385,12 +388,12 @@ func (m *aceMatcher) collectDiffs() []ACEDiff {
 }
 
 func aceIdentity(ace ACE) string {
-	sid := ace.GetSID()
+	sid := ace.SID()
 	sidStr := "<nil>"
 	if sid != nil {
 		sidStr = sid.Parsed
 	}
-	if objGUID := ace.GetObjectTypeGUID(); objGUID != "" {
+	if objGUID := ace.ObjectTypeGUID(); objGUID != "" {
 		return fmt.Sprintf("0x%02X:%s:%s", ace.Type(), sidStr, objGUID)
 	}
 	return fmt.Sprintf("0x%02X:%s", ace.Type(), sidStr)
@@ -406,22 +409,22 @@ func aceEqual(a, b ACE) bool {
 	if a.Type() != b.Type() {
 		return false
 	}
-	if a.GetAceFlags() != b.GetAceFlags() {
+	if a.AceFlags() != b.AceFlags() {
 		return false
 	}
-	if a.GetMask() != b.GetMask() {
+	if a.Mask() != b.Mask() {
 		return false
 	}
-	if !sidEqual(a.GetSID(), b.GetSID()) {
+	if !sidEqual(a.SID(), b.SID()) {
 		return false
 	}
-	if a.GetObjectTypeGUID() != b.GetObjectTypeGUID() {
+	if a.ObjectTypeGUID() != b.ObjectTypeGUID() {
 		return false
 	}
-	if a.GetInheritedObjectTypeGUID() != b.GetInheritedObjectTypeGUID() {
+	if a.InheritedObjectTypeGUID() != b.InheritedObjectTypeGUID() {
 		return false
 	}
-	if !bytes.Equal(a.GetApplicationData(), b.GetApplicationData()) {
+	if !bytes.Equal(a.ApplicationData(), b.ApplicationData()) {
 		return false
 	}
 	return true

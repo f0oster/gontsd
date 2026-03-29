@@ -9,7 +9,7 @@ import (
 type SecurityDescriptor struct {
 	Revision     uint8
 	sbz1         uint8
-	ControlFlags uint16
+	ControlFlags ControlFlags
 	OwnerSID     *SID
 	GroupSID     *SID
 	DACL         *ACL
@@ -53,7 +53,7 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 	sd := &SecurityDescriptor{
 		Revision:     descriptor[0],
 		sbz1:         descriptor[1],
-		ControlFlags: binary.LittleEndian.Uint16(descriptor[2:4]),
+		ControlFlags: ControlFlags(binary.LittleEndian.Uint16(descriptor[2:4])),
 		ownerOffset:  binary.LittleEndian.Uint32(descriptor[4:8]),
 		groupOffset:  binary.LittleEndian.Uint32(descriptor[8:12]),
 		saclOffset:   binary.LittleEndian.Uint32(descriptor[12:16]),
@@ -145,7 +145,7 @@ func (sd *SecurityDescriptor) CollectSIDs() []*SID {
 			continue
 		}
 		for _, ace := range acl.ACEs {
-			add(ace.GetSID())
+			add(ace.SID())
 		}
 	}
 
@@ -158,7 +158,7 @@ func (sd *SecurityDescriptor) String() string {
 	}
 	return fmt.Sprintf(`Security Descriptor:
   Revision:      %d
-  ControlFlags:  0x%04X
+  ControlFlags:  %s
   OwnerSID:      %s
   GroupSID:      %s
 

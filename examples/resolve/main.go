@@ -88,12 +88,12 @@ func main() {
 		fmt.Printf("\nDACL (%d ACEs):\n", len(sd.DACL.ACEs))
 		for i, ace := range sd.DACL.ACEs {
 			fmt.Printf("\n  [%d] %sACE\n", i, ace.Type())
-			fmt.Printf("      SID:    %s\n", resolve.FormatSID(ace.GetSID(), sidResolver))
-			fmt.Printf("      Rights: %v\n", ace.GetAccessRights())
-			if guid := ace.GetObjectTypeGUID(); guid != "" {
+			fmt.Printf("      SID:    %s\n", resolve.FormatSID(ace.SID(), sidResolver))
+			fmt.Printf("      Mask:   %s\n", ace.Mask())
+			if guid := ace.ObjectTypeGUID(); guid != "" {
 				fmt.Printf("      ObjectType: %s\n", resolveGUID(guid, guidResolver))
 			}
-			if guid := ace.GetInheritedObjectTypeGUID(); guid != "" {
+			if guid := ace.InheritedObjectTypeGUID(); guid != "" {
 				fmt.Printf("      InheritedObjectType: %s\n", resolveGUID(guid, guidResolver))
 			}
 		}

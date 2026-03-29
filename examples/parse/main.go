@@ -32,14 +32,14 @@ func main() {
 
 	fmt.Printf("Owner: %s\n", sd.OwnerSID.Parsed)
 	fmt.Printf("Group: %s\n", sd.GroupSID.Parsed)
-	fmt.Printf("Control: 0x%04X\n", sd.ControlFlags)
+	fmt.Printf("Control: %s\n", sd.ControlFlags)
 
 	if sd.DACL != nil {
 		fmt.Printf("\nDACL (%d ACEs):\n", len(sd.DACL.ACEs))
 		for i, ace := range sd.DACL.ACEs {
-			fmt.Printf("  [%d] %s SID=%s Mask=0x%08X\n",
-				i, ace.Type(), ace.GetSID().Parsed, ace.GetMask())
-			if guid := ace.GetObjectTypeGUID(); guid != "" {
+			fmt.Printf("  [%d] %s SID=%s Mask=%s\n",
+				i, ace.Type(), ace.SID().Parsed, ace.Mask())
+			if guid := ace.ObjectTypeGUID(); guid != "" {
 				fmt.Printf("       ObjectType: %s\n", guid)
 			}
 		}
@@ -48,8 +48,8 @@ func main() {
 	if sd.SACL != nil {
 		fmt.Printf("\nSACL (%d ACEs):\n", len(sd.SACL.ACEs))
 		for i, ace := range sd.SACL.ACEs {
-			fmt.Printf("  [%d] %s SID=%s Mask=0x%08X\n",
-				i, ace.Type(), ace.GetSID().Parsed, ace.GetMask())
+			fmt.Printf("  [%d] %s SID=%s Mask=%s\n",
+				i, ace.Type(), ace.SID().Parsed, ace.Mask())
 		}
 	}
 }

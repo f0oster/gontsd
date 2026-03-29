@@ -54,7 +54,7 @@ func main() {
 		fmt.Printf("Group: %s -> %s\n", diff.OldGroup.Parsed, diff.NewGroup.Parsed)
 	}
 	if diff.ControlFlagsChanged {
-		fmt.Printf("Control: 0x%04X -> 0x%04X\n", diff.OldControlFlags, diff.NewControlFlags)
+		fmt.Printf("Control: %s -> %s\n", diff.OldControlFlags, diff.NewControlFlags)
 	}
 
 	printACLDiff("DACL", diff.DACLDiff)
@@ -72,21 +72,21 @@ func printACLDiff(name string, aclDiff *gontsd.ACLDiff) {
 		switch {
 		case dt.Has(gontsd.DiffAdded):
 			fmt.Printf("  [+] pos %d: %s SID=%s\n",
-				d.NewPosition, d.NewACE.Type(), d.NewACE.GetSID().Parsed)
+				d.NewPosition, d.NewACE.Type(), d.NewACE.SID().Parsed)
 		case dt.Has(gontsd.DiffRemoved):
 			fmt.Printf("  [-] pos %d: %s SID=%s\n",
-				d.OldPosition, d.OldACE.Type(), d.OldACE.GetSID().Parsed)
+				d.OldPosition, d.OldACE.Type(), d.OldACE.SID().Parsed)
 		case dt.Has(gontsd.DiffModified) && dt.Has(gontsd.DiffReordered):
-			fmt.Printf("  [~↔] pos %d->%d: %s SID=%s mask 0x%X->0x%X\n",
+			fmt.Printf("  [~↔] pos %d->%d: %s SID=%s mask %s->%s\n",
 				d.OldPosition, d.NewPosition, d.NewACE.Type(),
-				d.NewACE.GetSID().Parsed, d.OldACE.GetMask(), d.NewACE.GetMask())
+				d.NewACE.SID().Parsed, d.OldACE.Mask(), d.NewACE.Mask())
 		case dt.Has(gontsd.DiffModified):
-			fmt.Printf("  [~] pos %d: %s SID=%s mask 0x%X->0x%X\n",
+			fmt.Printf("  [~] pos %d: %s SID=%s mask %s->%s\n",
 				d.NewPosition, d.NewACE.Type(),
-				d.NewACE.GetSID().Parsed, d.OldACE.GetMask(), d.NewACE.GetMask())
+				d.NewACE.SID().Parsed, d.OldACE.Mask(), d.NewACE.Mask())
 		case dt.Has(gontsd.DiffReordered):
 			fmt.Printf("  [↔] pos %d->%d: %s SID=%s\n",
-				d.OldPosition, d.NewPosition, d.NewACE.Type(), d.NewACE.GetSID().Parsed)
+				d.OldPosition, d.NewPosition, d.NewACE.Type(), d.NewACE.SID().Parsed)
 		}
 	}
 }
