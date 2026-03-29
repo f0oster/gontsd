@@ -48,9 +48,6 @@ func (info SchemaGUIDInfo) FormatAppliesTo() string {
 }
 
 // SchemaGUIDResolver resolves schema GUIDs to human-readable names and metadata.
-// Implementations include [wellKnownSchemaGUIDResolver] for well-known schema
-// classes, attributes, and extended rights, [ldapSchemaGUIDResolver] for Active
-// Directory schema lookups, and [chainSchemaGUIDResolver] to try multiple
 // resolvers in order.
 type SchemaGUIDResolver interface {
 	ResolveGUID(guid string) (*SchemaGUIDInfo, error)

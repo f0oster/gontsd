@@ -12,7 +12,7 @@ Currently, there is no support for SDDL in the library. It may be added later.
 ```go
 // Parse a binary security descriptor and resolve object names using the default, non-LDAP connected resolver.
 // The default resolver covers well-known SIDs and common AD schema GUIDs.
-// For Active Directory security descriptors, use ldapresolver.NewLDAPResolver()
+// For Active Directory security descriptors, use gontsd.NewLDAPResolver()
 // instead for full domain-specific resolution - see the Resolution section.
 r := gontsd.NewResolver()
 sd, err := gontsd.Parse(data, r)
@@ -132,12 +132,10 @@ if diff.DACLDiff != nil {
 
 Domain-specific accounts, custom schema extensions, and GUIDs not in the built-in tables require LDAP resolution.
 
-For full resolution against Active Directory, use the `ldapresolver` sub-package:
+For full resolution against Active Directory, use `NewLDAPResolver`:
 
 ```go
-import "github.com/f0oster/gontsd/ldapresolver"
-
-client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
+client, err := gontsd.NewLDAPClient(gontsd.LDAPConfig{
     Server:   "ldaps://dc.example.com:636",
     BaseDN:   "DC=example,DC=com",
     BindDN:   "user@example.com",
@@ -148,7 +146,7 @@ if err != nil {
 }
 defer client.Close()
 
-r, err := ldapresolver.NewLDAPResolver(client)
+r, err := gontsd.NewLDAPResolver(client)
 if err != nil {
     log.Fatal(err)
 }
@@ -158,7 +156,7 @@ sd, err := gontsd.Parse(data, r)
 
 Resolution is automatic - `Parse` batch-resolves all SIDs upfront and stores the resolver on each SID and GUID. The results flow through `Compare` too, since the diff references the same SID/GUID pointers from the parsed descriptors.
 
-The LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly - see the [ldapresolver](./ldapresolver) package for reference.
+The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces directly.
 
 ## Examples
 
@@ -173,6 +171,51 @@ go run ./examples/dump \
   -ldap-password "password" \
   -object-dn "DC=example,DC=com"
 ```
+
+## API Reference
+
+### Core functions
+
+| Function | Description |
+|----------|-------------|
+| `Parse(data, r)` | Parse binary security descriptor bytes, optionally resolving SIDs and GUIDs |
+| `Compare(old, new)` | Diff two security descriptors |
+| `NewResolver()` | Create a resolver using built-in well-known tables |
+| `NewLDAPResolver(client)` | Create a resolver backed by Active Directory |
+| `NewLDAPClient(config)` | Establish an LDAP connection for use with `NewLDAPResolver` |
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `SecurityDescriptor` | Parsed security descriptor (owner, group, DACL, SACL) |
+| `ACL` | Access control list containing ACE entries |
+| `ACE` | Interface for access control entries |
+| `SID` | Security identifier with `String()` and `Resolved()` |
+| `GUID` | Schema GUID with `String()`, `Resolved()`, `Name`, `Type`, `Description` |
+| `Resolver` | Holds SID and GUID resolvers |
+| `LDAPClient` | LDAP connection wrapper |
+| `LDAPConfig` | LDAP connection settings |
+| `DiffResult` | Result of comparing two security descriptors |
+| `ACEDiff` | Single ACE change with `CompareAccessRights()` |
+
+### Typed bitmasks
+
+All have `Has(flag)`, `Names()`, and `String()` methods.
+
+| Type | Description |
+|------|-------------|
+| `AccessMask` | Permission flags (`RIGHT_DS_READ_PROPERTY`, `RIGHT_WRITE_DAC`, etc.) |
+| `ACEFlags` | Inheritance and audit flags (`INHERITED_ACE`, `CONTAINER_INHERIT_ACE`, etc.) |
+| `ControlFlags` | SD-level flags (`SE_DACL_PRESENT`, `SE_SELF_RELATIVE`, etc.) |
+| `DiffType` | Change types (`DiffAdded`, `DiffRemoved`, `DiffModified`, `DiffReordered`) |
+
+### Interfaces
+
+| Interface | Method | Description |
+|-----------|--------|-------------|
+| `SIDResolver` | `Resolve(sid) (name, error)` | Resolve a SID to a display name |
+| `SchemaGUIDResolver` | `ResolveGUID(guid) (*SchemaGUIDInfo, error)` | Resolve a GUID to schema metadata |
 
 ## References
 

@@ -181,8 +181,6 @@ var domainRelativeRIDs = map[string]string{
 }
 
 // SIDResolver resolves SIDs to human-readable names.
-// Implementations include [wellKnownSIDResolver] for built-in Windows SIDs,
-// [ldapSIDResolver] for Active Directory lookups, and [chainSIDResolver]
 // to try multiple resolvers in order.
 type SIDResolver interface {
 	Resolve(sid *SID) (name string, err error)

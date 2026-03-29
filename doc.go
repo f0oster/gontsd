@@ -3,7 +3,10 @@
 //
 // Pass a [*Resolver] to [Parse] to resolve SIDs and GUIDs to
 // human-readable names. Use [NewResolver] for built-in well-known
-// tables, or the [ldapresolver] sub-package for Active Directory lookups.
+// tables, or [NewLDAPResolver] for Active Directory lookups.
+//
+// For custom directory backends, implement the [SIDResolver] and
+// [SchemaGUIDResolver] interfaces directly.
 //
 // References:
 //   - MS-DTYP (Security Descriptor structure): https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/
