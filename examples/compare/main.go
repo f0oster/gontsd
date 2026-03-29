@@ -12,7 +12,6 @@ import (
 	"os"
 
 	"github.com/f0oster/gontsd"
-	"github.com/f0oster/gontsd/ldapresolver"
 )
 
 func main() {
@@ -29,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
+	client, err := gontsd.NewLDAPClient(gontsd.LDAPConfig{
 		Server:             *ldapServer,
 		BaseDN:             *ldapBaseDN,
 		BindDN:             *ldapBindDN,
@@ -43,7 +42,7 @@ func main() {
 	}
 	defer client.Close()
 
-	r, err := ldapresolver.NewLDAPResolver(client)
+	r, err := gontsd.NewLDAPResolver(client)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to set up resolver: %v\n", err)
 		os.Exit(1)

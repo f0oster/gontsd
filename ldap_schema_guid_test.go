@@ -1,4 +1,4 @@
-package ldapresolver
+package gontsd
 
 import "testing"
 

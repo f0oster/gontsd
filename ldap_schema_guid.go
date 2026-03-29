@@ -1,4 +1,4 @@
-package ldapresolver
+package gontsd
 
 import (
 	"encoding/hex"
@@ -6,18 +6,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/f0oster/gontsd"
 	"github.com/go-ldap/ldap/v3"
 )
 
 // LDAPSchemaGUIDResolver resolves schema GUIDs by querying Active Directory.
 type LDAPSchemaGUIDResolver struct {
 	client *LDAPClient
-	cache  map[string]gontsd.SchemaGUIDInfo
+	cache  map[string]SchemaGUIDInfo
 	mu     sync.RWMutex
 }
 
-var _ gontsd.SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
+var _ SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 
 // NewLDAPSchemaGUIDResolver creates a new LDAP-backed schema GUID resolver.
 // It preloads schema classes and extended rights from AD so that subsequent
@@ -25,7 +24,7 @@ var _ gontsd.SchemaGUIDResolver = (*LDAPSchemaGUIDResolver)(nil)
 func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, error) {
 	r := &LDAPSchemaGUIDResolver{
 		client: client,
-		cache:  make(map[string]gontsd.SchemaGUIDInfo),
+		cache:  make(map[string]SchemaGUIDInfo),
 	}
 
 	if err := r.preloadSchema(); err != nil {
@@ -39,8 +38,8 @@ func NewLDAPSchemaGUIDResolver(client *LDAPClient) (*LDAPSchemaGUIDResolver, err
 	return r, nil
 }
 
-func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*gontsd.SchemaGUIDInfo, error) {
-	normalizedGUID := gontsd.NormalizeGUID(guid)
+func (r *LDAPSchemaGUIDResolver) ResolveGUID(guid string) (*SchemaGUIDInfo, error) {
+	normalizedGUID := NormalizeGUID(guid)
 
 	r.mu.RLock()
 	if info, ok := r.cache[normalizedGUID]; ok {
@@ -84,26 +83,26 @@ func (r *LDAPSchemaGUIDResolver) preloadSchema() error {
 			continue
 		}
 
-		guidStr, err := gontsd.GUIDBytesToString(rawGUID)
+		guidStr, err := GUIDBytesToString(rawGUID)
 		if err != nil {
 			continue
 		}
-		normalizedGUID := gontsd.NormalizeGUID(guidStr)
+		normalizedGUID := NormalizeGUID(guidStr)
 
 		name := entry.GetAttributeValue("ldapDisplayName")
 		if name == "" {
 			name = entry.GetAttributeValue("cn")
 		}
 
-		guidType := gontsd.GUIDTypeAttribute
+		guidType := GUIDTypeAttribute
 		for _, oc := range entry.GetAttributeValues("objectClass") {
 			if oc == "classSchema" {
-				guidType = gontsd.GUIDTypeClass
+				guidType = GUIDTypeClass
 				break
 			}
 		}
 
-		r.cache[normalizedGUID] = gontsd.SchemaGUIDInfo{
+		r.cache[normalizedGUID] = SchemaGUIDInfo{
 			Name: name,
 			Type: guidType,
 			GUID: normalizedGUID,
@@ -140,7 +139,7 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 			continue
 		}
 
-		normalizedGUID := gontsd.NormalizeGUID(rightsGuid)
+		normalizedGUID := NormalizeGUID(rightsGuid)
 		name := entry.GetAttributeValue("displayName")
 		if name == "" {
 			name = entry.GetAttributeValue("cn")
@@ -149,17 +148,17 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 		guidType := determineExtendedRightType(entry.GetAttributeValue("validAccesses"))
 
 		appliesToGUIDs := entry.GetAttributeValues("appliesTo")
-		var appliesTo []gontsd.AppliesToEntry
+		var appliesTo []AppliesToEntry
 		for _, classGUID := range appliesToGUIDs {
-			normalized := gontsd.NormalizeGUID(classGUID)
-			ae := gontsd.AppliesToEntry{GUID: normalized}
+			normalized := NormalizeGUID(classGUID)
+			ae := AppliesToEntry{GUID: normalized}
 			if cached, ok := r.cache[normalized]; ok {
 				ae.Name = cached.Name
 			}
 			appliesTo = append(appliesTo, ae)
 		}
 
-		r.cache[normalizedGUID] = gontsd.SchemaGUIDInfo{
+		r.cache[normalizedGUID] = SchemaGUIDInfo{
 			Name:      name,
 			Type:      guidType,
 			GUID:      normalizedGUID,
@@ -170,12 +169,12 @@ func (r *LDAPSchemaGUIDResolver) preloadExtendedRights() error {
 	return nil
 }
 
-func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (gontsd.SchemaGUIDInfo, error) {
+func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (SchemaGUIDInfo, error) {
 	schemaDN := fmt.Sprintf("CN=Schema,CN=Configuration,%s", r.client.BaseDN())
 
 	binaryFilter, err := guidStringToBinaryFilter(guid)
 	if err != nil {
-		return gontsd.SchemaGUIDInfo{}, fmt.Errorf("invalid GUID %q: %w", guid, err)
+		return SchemaGUIDInfo{}, fmt.Errorf("invalid GUID %q: %w", guid, err)
 	}
 
 	searchRequest := ldap.NewSearchRequest(
@@ -190,11 +189,11 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (gontsd.SchemaGUIDInfo
 
 	sr, err := r.client.Conn().Search(searchRequest)
 	if err != nil {
-		return gontsd.SchemaGUIDInfo{}, fmt.Errorf("LDAP schema search failed: %w", err)
+		return SchemaGUIDInfo{}, fmt.Errorf("LDAP schema search failed: %w", err)
 	}
 
 	if len(sr.Entries) == 0 {
-		return gontsd.SchemaGUIDInfo{}, gontsd.ErrSchemaGUIDNotFound
+		return SchemaGUIDInfo{}, ErrSchemaGUIDNotFound
 	}
 
 	entry := sr.Entries[0]
@@ -203,37 +202,37 @@ func (r *LDAPSchemaGUIDResolver) querySchema(guid string) (gontsd.SchemaGUIDInfo
 		name = entry.GetAttributeValue("cn")
 	}
 
-	guidType := gontsd.GUIDTypeAttribute
+	guidType := GUIDTypeAttribute
 	for _, oc := range entry.GetAttributeValues("objectClass") {
 		if oc == "classSchema" {
-			guidType = gontsd.GUIDTypeClass
+			guidType = GUIDTypeClass
 			break
 		}
 	}
 
-	return gontsd.SchemaGUIDInfo{
+	return SchemaGUIDInfo{
 		Name: name,
 		Type: guidType,
 		GUID: guid,
 	}, nil
 }
 
-func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info gontsd.SchemaGUIDInfo) {
+func (r *LDAPSchemaGUIDResolver) cacheGUID(guid string, info SchemaGUIDInfo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cache[guid] = info
 }
 
-func determineExtendedRightType(validAccesses string) gontsd.GUIDType {
+func determineExtendedRightType(validAccesses string) GUIDType {
 	switch validAccesses {
 	case "256":
-		return gontsd.GUIDTypeExtendedRight
+		return GUIDTypeExtendedRight
 	case "8":
-		return gontsd.GUIDTypeValidatedWrite
+		return GUIDTypeValidatedWrite
 	case "48":
-		return gontsd.GUIDTypePropertySet
+		return GUIDTypePropertySet
 	default:
-		return gontsd.GUIDTypeExtendedRight
+		return GUIDTypeExtendedRight
 	}
 }
 
@@ -262,7 +261,7 @@ func guidStringToBinaryFilter(guid string) (string, error) {
 func (r *LDAPSchemaGUIDResolver) ClearCache() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.cache = make(map[string]gontsd.SchemaGUIDInfo)
+	r.cache = make(map[string]SchemaGUIDInfo)
 }
 
 func (r *LDAPSchemaGUIDResolver) CacheSize() int {

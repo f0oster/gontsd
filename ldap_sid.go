@@ -1,4 +1,4 @@
-package ldapresolver
+package gontsd
 
 import (
 	"encoding/binary"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/f0oster/gontsd"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -31,7 +30,7 @@ type LDAPSIDResolver struct {
 	maxCacheSize int
 }
 
-var _ gontsd.SIDResolver = (*LDAPSIDResolver)(nil)
+var _ SIDResolver = (*LDAPSIDResolver)(nil)
 
 // NewLDAPSIDResolver creates a new LDAP-backed SID resolver.
 func NewLDAPSIDResolver(client *LDAPClient, opts ...SIDResolverOption) *LDAPSIDResolver {
@@ -57,7 +56,7 @@ func WithMaxSIDCacheSize(n int) SIDResolverOption {
 	}
 }
 
-func (r *LDAPSIDResolver) Resolve(sid *gontsd.SID) (string, error) {
+func (r *LDAPSIDResolver) Resolve(sid *SID) (string, error) {
 	if sid == nil {
 		return "", fmt.Errorf("nil SID")
 	}
@@ -83,18 +82,18 @@ const maxSIDsPerQuery = 50
 
 // ResolveBatch resolves multiple SIDs, using a single LDAP query per batch
 // of uncached SIDs. Results are keyed by SID string (e.g. "S-1-5-21-...").
-func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) map[string]gontsd.SIDResult {
-	results := make(map[string]gontsd.SIDResult, len(sids))
+func (r *LDAPSIDResolver) ResolveBatch(sids []*SID) map[string]SIDResult {
+	results := make(map[string]SIDResult, len(sids))
 
 	// Partition into cached/resolved and needing LDAP lookup.
-	var needQuery []*gontsd.SID
+	var needQuery []*SID
 	r.mu.RLock()
 	for _, sid := range sids {
 		if sid == nil {
 			continue
 		}
 		if name, ok := r.cache[sid.Value]; ok {
-			results[sid.Value] = gontsd.SIDResult{Name: name}
+			results[sid.Value] = SIDResult{Name: name}
 		} else {
 			needQuery = append(needQuery, sid)
 		}
@@ -113,13 +112,13 @@ func (r *LDAPSIDResolver) ResolveBatch(sids []*gontsd.SID) map[string]gontsd.SID
 	return results
 }
 
-func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gontsd.SIDResult) {
+func (r *LDAPSIDResolver) queryBatch(sids []*SID, results map[string]SIDResult) {
 	if len(sids) == 0 {
 		return
 	}
 
 	// Build OR filter: (|(objectSid=\xx...)(...))
-	sidByBinary := make(map[string]*gontsd.SID, len(sids))
+	sidByBinary := make(map[string]*SID, len(sids))
 	var filterParts []string
 	for _, sid := range sids {
 		binarySID := sidToBinaryString(sid.Raw)
@@ -146,7 +145,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gont
 	if err != nil {
 		// Mark all SIDs in this batch as failed.
 		for _, sid := range sids {
-			results[sid.Value] = gontsd.SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
+			results[sid.Value] = SIDResult{Err: fmt.Errorf("LDAP search failed: %w", err)}
 		}
 		return
 	}
@@ -163,7 +162,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gont
 		found[sid.Value] = true
 
 		resolvedName := extractName(entry)
-		results[sid.Value] = gontsd.SIDResult{Name: resolvedName}
+		results[sid.Value] = SIDResult{Name: resolvedName}
 
 		r.cacheSID(sid.Value, resolvedName)
 	}
@@ -171,7 +170,7 @@ func (r *LDAPSIDResolver) queryBatch(sids []*gontsd.SID, results map[string]gont
 	// Mark SIDs with no LDAP result.
 	for _, sid := range sids {
 		if !found[sid.Value] {
-			results[sid.Value] = gontsd.SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Value)}
+			results[sid.Value] = SIDResult{Err: fmt.Errorf("SID not found in AD: %s", sid.Value)}
 		}
 	}
 }
@@ -198,7 +197,7 @@ func (r *LDAPSIDResolver) cacheSID(parsed, name string) {
 	r.cache[parsed] = name
 }
 
-func (r *LDAPSIDResolver) queryAD(sid *gontsd.SID) (string, error) {
+func (r *LDAPSIDResolver) queryAD(sid *SID) (string, error) {
 	binarySID := sidToBinaryString(sid.Raw)
 
 	searchRequest := ldap.NewSearchRequest(

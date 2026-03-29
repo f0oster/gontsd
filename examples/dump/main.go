@@ -16,7 +16,6 @@ import (
 	"os"
 
 	"github.com/f0oster/gontsd"
-	"github.com/f0oster/gontsd/ldapresolver"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -37,7 +36,7 @@ func main() {
 
 	targetDN := *objectDN
 
-	client, err := ldapresolver.NewLDAPClient(ldapresolver.LDAPConfig{
+	client, err := gontsd.NewLDAPClient(gontsd.LDAPConfig{
 		Server:             *ldapServer,
 		BaseDN:             *ldapBaseDN,
 		BindDN:             *ldapBindDN,
@@ -57,7 +56,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	r, err := ldapresolver.NewLDAPResolver(client)
+	r, err := gontsd.NewLDAPResolver(client)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to set up resolver: %v\n", err)
 		os.Exit(1)
@@ -78,7 +77,7 @@ func main() {
 	printACL("SACL", sd.SACL)
 }
 
-func fetchSecurityDescriptor(client *ldapresolver.LDAPClient, dn string) ([]byte, error) {
+func fetchSecurityDescriptor(client *gontsd.LDAPClient, dn string) ([]byte, error) {
 	sdFlagsControl := ldap.NewControlMicrosoftSDFlags()
 	sdFlagsControl.ControlValue = 0x07 // owner + group + DACL
 
