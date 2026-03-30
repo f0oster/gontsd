@@ -1,6 +1,7 @@
 package gontsd
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -44,6 +45,56 @@ func TestParse_AllACETypes_Header(t *testing.T) {
 	}
 	if sd.SACL == nil {
 		t.Fatal("SACL is nil")
+	}
+}
+
+func TestParse_WithResolver(t *testing.T) {
+	data := loadFixture(t, "all_ace_types/sd.bin")
+	r := NewResolver()
+	sd, err := Parse(data, r)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	// Owner SID (S-1-5-18 = Local System) should be resolved.
+	resolved := sd.OwnerSID.Resolved()
+	if resolved == sd.OwnerSID.Value {
+		t.Errorf("OwnerSID.Resolved() = %q, expected resolved name", resolved)
+	}
+	if !strings.Contains(resolved, "S-1-5-18") {
+		t.Errorf("OwnerSID.Resolved() = %q, should contain raw SID", resolved)
+	}
+
+	// A well-known SID in the DACL (Everyone = S-1-1-0) should also resolve.
+	ace0SID := sd.DACL.ACEs[0].SID()
+	if ace0SID.Resolved() == ace0SID.Value {
+		t.Errorf("ACE[0] SID.Resolved() = %q, expected resolved name", ace0SID.Resolved())
+	}
+
+	// Object type GUIDs should be resolved to names.
+	// ACE[5] is AccessAllowedObject with ObjectType=Reset-Password.
+	objGUID := sd.DACL.ACEs[5].ObjectTypeGUID()
+	if objGUID == nil {
+		t.Fatal("ACE[5].ObjectTypeGUID() is nil")
+	}
+	if objGUID.Name == "" {
+		t.Error("ObjectTypeGUID.Name should be populated after resolution")
+	}
+	if objGUID.Resolved() == objGUID.Raw {
+		t.Errorf("ObjectTypeGUID.Resolved() = %q, expected resolved name", objGUID.Resolved())
+	}
+
+	// Domain-relative SIDs (S-1-5-21-...) won't resolve with just well-known tables.
+	// Verify they fall back gracefully to the raw value.
+	for _, ace := range sd.DACL.ACEs {
+		sid := ace.SID()
+		if sid == nil {
+			continue
+		}
+		r := sid.Resolved()
+		if r == "" {
+			t.Errorf("SID.Resolved() returned empty for %s", sid.Value)
+		}
 	}
 }
 
@@ -91,6 +142,99 @@ func TestSecurityDescriptor_String_Nil(t *testing.T) {
 	if s := sd.String(); s != "<nil>" {
 		t.Errorf("nil SecurityDescriptor.String() = %q, want %q", s, "<nil>")
 	}
+}
+
+func TestSecurityDescriptor_String(t *testing.T) {
+	data := loadFixture(t, "all_ace_types/sd.bin")
+	sd, err := Parse(data, nil)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	s := sd.String()
+	if s == "" {
+		t.Fatal("String() is empty")
+	}
+	if !strings.Contains(s, "Security Descriptor:") {
+		t.Error("String() should contain header")
+	}
+	if !strings.Contains(s, "DACL:") {
+		t.Error("String() should contain DACL section")
+	}
+	if !strings.Contains(s, "SACL:") {
+		t.Error("String() should contain SACL section")
+	}
+	if !strings.Contains(s, "S-1-5-18") {
+		t.Error("String() should contain owner SID")
+	}
+}
+
+func TestACL_String(t *testing.T) {
+	data := loadFixture(t, "object_aces/sd.bin")
+	sd, err := Parse(data, nil)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	s := sd.DACL.String()
+	if !strings.Contains(s, "ACL (Revision:") {
+		t.Error("ACL.String() should contain header")
+	}
+	if !strings.Contains(s, "ACE[0]:") {
+		t.Error("ACL.String() should contain ACE entries")
+	}
+}
+
+func TestACL_String_Nil(t *testing.T) {
+	var acl *ACL
+	if s := acl.String(); s != "<nil>" {
+		t.Errorf("nil ACL.String() = %q, want <nil>", s)
+	}
+}
+
+func TestGUID_Methods(t *testing.T) {
+	t.Run("Nil", func(t *testing.T) {
+		var g *GUID
+		if g.String() != "" {
+			t.Error("nil GUID.String() should be empty")
+		}
+		if g.Resolved() != "" {
+			t.Error("nil GUID.Resolved() should be empty")
+		}
+	})
+
+	t.Run("Unresolved", func(t *testing.T) {
+		g := &GUID{Raw: "some-guid"}
+		if g.String() != "some-guid" {
+			t.Errorf("String() = %q, want some-guid", g.String())
+		}
+		if g.Resolved() != "some-guid" {
+			t.Errorf("Resolved() = %q, want some-guid (fallback)", g.Resolved())
+		}
+	})
+
+	t.Run("Resolved", func(t *testing.T) {
+		g := &GUID{Raw: "some-guid", Name: "Friendly Name"}
+		if g.Resolved() != "Friendly Name" {
+			t.Errorf("Resolved() = %q, want Friendly Name", g.Resolved())
+		}
+	})
+}
+
+func TestSID_Resolved(t *testing.T) {
+	t.Run("Nil", func(t *testing.T) {
+		var s *SID
+		if s.Resolved() != "<nil>" {
+			t.Errorf("nil SID.Resolved() = %q, want <nil>", s.Resolved())
+		}
+	})
+
+	t.Run("NoResolver", func(t *testing.T) {
+		s := &SID{Value: "S-1-5-18"}
+		if s.Resolved() != "S-1-5-18" {
+			t.Errorf("Resolved() = %q, want raw SID", s.Resolved())
+		}
+	})
 }
 
 func TestCollectSIDs(t *testing.T) {
