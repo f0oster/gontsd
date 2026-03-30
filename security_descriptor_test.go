@@ -1,120 +1,11 @@
 package gontsd
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-func loadTestData(t *testing.T, path string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("examples", "test_cases", path))
-	if err != nil {
-		t.Fatalf("failed to read test data %s: %v", path, err)
-	}
-	return data
-}
-
-func TestParse_AddingNewUser(t *testing.T) {
-	tests := []struct {
-		name     string
-		file     string
-		aceCount int
-		ownerSID string
-		groupSID string
-	}{
-		{
-			name:     "default",
-			file:     "adding_new_user/sd-filedomain_default.bin",
-			aceCount: 4,
-			ownerSID: "S-1-5-21-75115020-4145467708-3593911600-1612",
-			groupSID: "S-1-5-21-75115020-4145467708-3593911600-513",
-		},
-		{
-			name:     "change",
-			file:     "adding_new_user/sd-filedomain_change.bin",
-			aceCount: 5,
-			ownerSID: "S-1-5-21-75115020-4145467708-3593911600-1612",
-			groupSID: "S-1-5-21-75115020-4145467708-3593911600-513",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			data := loadTestData(t, tc.file)
-			sd, err := Parse(data, nil)
-			if err != nil {
-				t.Fatalf("Parse() error: %v", err)
-			}
-			if sd.Revision != 1 {
-				t.Errorf("Revision = %d, want 1", sd.Revision)
-			}
-			if sd.ControlFlags != 0x8404 {
-				t.Errorf("ControlFlags = 0x%04X, want 0x8404", sd.ControlFlags)
-			}
-			if sd.OwnerSID == nil || sd.OwnerSID.Value != tc.ownerSID {
-				t.Errorf("OwnerSID = %v, want %s", sd.OwnerSID, tc.ownerSID)
-			}
-			if sd.GroupSID == nil || sd.GroupSID.Value != tc.groupSID {
-				t.Errorf("GroupSID = %v, want %s", sd.GroupSID, tc.groupSID)
-			}
-			if sd.DACL == nil {
-				t.Fatal("DACL is nil")
-			}
-			if len(sd.DACL.ACEs) != tc.aceCount {
-				t.Errorf("DACL ACE count = %d, want %d", len(sd.DACL.ACEs), tc.aceCount)
-			}
-		})
-	}
-}
-
-func TestParse_FlagChanges(t *testing.T) {
-	tests := []struct {
-		name     string
-		file     string
-		ace0Mask AccessMask
-	}{
-		{
-			name:     "removing_flag/default",
-			file:     "removing_flag/sd-filedomain_default.bin",
-			ace0Mask: 0x001301BF,
-		},
-		{
-			name:     "removing_flag/change",
-			file:     "removing_flag/sd-filedomain_change.bin",
-			ace0Mask: 0x001200A9,
-		},
-		{
-			name:     "adding_flag/default",
-			file:     "adding_flag/sd-filedomain_default.bin",
-			ace0Mask: 0x001200A9,
-		},
-		{
-			name:     "adding_flag/change",
-			file:     "adding_flag/sd-filedomain_change.bin",
-			ace0Mask: 0x001301BF,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			data := loadTestData(t, tc.file)
-			sd, err := Parse(data, nil)
-			if err != nil {
-				t.Fatalf("Parse() error: %v", err)
-			}
-			if sd.DACL == nil || len(sd.DACL.ACEs) == 0 {
-				t.Fatal("DACL is nil or empty")
-			}
-			if sd.DACL.ACEs[0].Mask() != tc.ace0Mask {
-				t.Errorf("ACE[0] mask = %s, want %s", sd.DACL.ACEs[0].Mask(), tc.ace0Mask)
-			}
-		})
-	}
-}
-
-func TestParse_RootDomain(t *testing.T) {
-	data := loadTestData(t, "root_domain/sd-domainroot.bin")
+func TestParse_ObjectACEs_Header(t *testing.T) {
+	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
@@ -122,22 +13,37 @@ func TestParse_RootDomain(t *testing.T) {
 	if sd.Revision != 1 {
 		t.Errorf("Revision = %d, want 1", sd.Revision)
 	}
-	if sd.OwnerSID == nil || sd.OwnerSID.Value != "S-1-5-32-544" {
-		t.Errorf("OwnerSID = %v, want S-1-5-32-544", sd.OwnerSID)
+	if !sd.ControlFlags.Has(SE_DACL_PRESENT) {
+		t.Error("expected SE_DACL_PRESENT")
+	}
+	if sd.OwnerSID == nil || sd.OwnerSID.Value != "S-1-5-18" {
+		t.Errorf("OwnerSID = %v, want S-1-5-18", sd.OwnerSID)
+	}
+	if sd.GroupSID == nil || sd.GroupSID.Value != "S-1-5-18" {
+		t.Errorf("GroupSID = %v, want S-1-5-18", sd.GroupSID)
+	}
+}
+
+func TestParse_AllACETypes_Header(t *testing.T) {
+	data := loadFixture(t, "all_ace_types/sd.bin")
+	sd, err := Parse(data, nil)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+	if sd.Revision != 1 {
+		t.Errorf("Revision = %d, want 1", sd.Revision)
+	}
+	if !sd.ControlFlags.Has(SE_DACL_PRESENT) {
+		t.Error("expected SE_DACL_PRESENT")
+	}
+	if !sd.ControlFlags.Has(SE_SACL_PRESENT) {
+		t.Error("expected SE_SACL_PRESENT")
 	}
 	if sd.DACL == nil {
 		t.Fatal("DACL is nil")
 	}
-	if len(sd.DACL.ACEs) != 58 {
-		t.Errorf("DACL ACE count = %d, want 58", len(sd.DACL.ACEs))
-	}
-	// First ACE is a deny ACE
-	if sd.DACL.ACEs[0].Type() != AccessDeniedACEType {
-		t.Errorf("ACE[0] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[0].Type(), AccessDeniedACEType)
-	}
-	// Verify mix of ACE types: simple and object
-	if sd.DACL.ACEs[11].Type() != AccessAllowedObjectACEType {
-		t.Errorf("ACE[11] type = 0x%02X, want 0x%02X", sd.DACL.ACEs[11].Type(), AccessAllowedObjectACEType)
+	if sd.SACL == nil {
+		t.Fatal("SACL is nil")
 	}
 }
 
@@ -163,7 +69,6 @@ func TestParse_Errors(t *testing.T) {
 }
 
 func TestParse_MinimalValid(t *testing.T) {
-	// 20-byte descriptor with all offsets = 0 (no owner, group, DACL, SACL)
 	data := make([]byte, 20)
 	data[0] = 1 // revision
 	sd, err := Parse(data, nil)
@@ -189,7 +94,7 @@ func TestSecurityDescriptor_String_Nil(t *testing.T) {
 }
 
 func TestCollectSIDs(t *testing.T) {
-	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	data := loadFixture(t, "compare_add_ace/after.bin")
 	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse() error: %v", err)
@@ -197,13 +102,13 @@ func TestCollectSIDs(t *testing.T) {
 
 	sids := sd.collectSIDs()
 
-	// Owner + group + 4 ACE SIDs, but owner SID matches ACE[3] SID and
-	// group SID is unique, so expect 5 unique SIDs.
-	if len(sids) != 5 {
-		t.Errorf("collectSIDs() returned %d SIDs, want 5", len(sids))
+	// Owner (SY) + Group (SY) + ACE SIDs: SY, AU, WD
+	// Owner and group are both SY, which also appears in ACE[0].
+	// Unique SIDs: S-1-5-18 (SY), S-1-5-11 (AU), S-1-1-0 (WD) = 3
+	if len(sids) != 3 {
+		t.Errorf("collectSIDs() returned %d SIDs, want 3", len(sids))
 	}
 
-	// Check deduplication — no SID string should appear twice.
 	seen := make(map[string]bool)
 	for _, sid := range sids {
 		if seen[sid.Value] {
@@ -212,7 +117,6 @@ func TestCollectSIDs(t *testing.T) {
 		seen[sid.Value] = true
 	}
 
-	// Owner and group should be included.
 	if !seen[sd.OwnerSID.Value] {
 		t.Error("OwnerSID not in collectSIDs result")
 	}

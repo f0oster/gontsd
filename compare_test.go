@@ -4,22 +4,19 @@ import (
 	"testing"
 )
 
-func TestCompare_AddingNewUser(t *testing.T) {
-	defaultData := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
-	changeData := loadTestData(t, "adding_new_user/sd-filedomain_change.bin")
-
-	defaultSD, err := Parse(defaultData, nil)
+func TestCompare_AddACE(t *testing.T) {
+	before, err := Parse(loadFixture(t, "compare_add_ace/before.bin"), nil)
 	if err != nil {
-		t.Fatalf("Parse default: %v", err)
+		t.Fatalf("Parse before: %v", err)
 	}
-	changeSD, err := Parse(changeData, nil)
+	after, err := Parse(loadFixture(t, "compare_add_ace/after.bin"), nil)
 	if err != nil {
-		t.Fatalf("Parse change: %v", err)
+		t.Fatalf("Parse after: %v", err)
 	}
 
-	diff := Compare(defaultSD, changeSD)
+	diff := Compare(before, after)
 	if !diff.HasChanges() {
-		t.Fatal("expected changes, got none")
+		t.Fatal("expected changes")
 	}
 	if diff.OwnerChanged {
 		t.Error("owner should not have changed")
@@ -28,40 +25,72 @@ func TestCompare_AddingNewUser(t *testing.T) {
 		t.Error("group should not have changed")
 	}
 	if diff.DACLDiff == nil {
-		t.Fatal("DACLDiff is nil, expected changes")
+		t.Fatal("DACLDiff is nil")
 	}
 
-	// Should have an added ACE
 	var foundAdded bool
 	for _, d := range diff.DACLDiff.ACEDiffs {
 		if d.Type.Has(DiffAdded) {
 			foundAdded = true
-			if d.NewACE.SID().Value != "S-1-5-21-75115020-4145467708-3593911600-1627" {
-				t.Errorf("added ACE SID = %s, want ...1627", d.NewACE.SID().Value)
+			if d.NewACE == nil {
+				t.Error("added ACE diff has nil NewACE")
+			} else if d.NewACE.SID() == nil || d.NewACE.SID().Value != "S-1-1-0" {
+				t.Errorf("added ACE SID = %v, want S-1-1-0", d.NewACE.SID())
 			}
 		}
 	}
 	if !foundAdded {
-		t.Error("expected a DiffAdded entry in DACLDiff")
+		t.Error("expected a DiffAdded entry")
 	}
 }
 
-func TestCompare_RemovingFlag(t *testing.T) {
-	defaultData := loadTestData(t, "removing_flag/sd-filedomain_default.bin")
-	changeData := loadTestData(t, "removing_flag/sd-filedomain_change.bin")
-
-	defaultSD, err := Parse(defaultData, nil)
+func TestCompare_RemoveACE(t *testing.T) {
+	before, err := Parse(loadFixture(t, "compare_remove_ace/before.bin"), nil)
 	if err != nil {
-		t.Fatalf("Parse default: %v", err)
+		t.Fatalf("Parse before: %v", err)
 	}
-	changeSD, err := Parse(changeData, nil)
+	after, err := Parse(loadFixture(t, "compare_remove_ace/after.bin"), nil)
 	if err != nil {
-		t.Fatalf("Parse change: %v", err)
+		t.Fatalf("Parse after: %v", err)
 	}
 
-	diff := Compare(defaultSD, changeSD)
+	diff := Compare(before, after)
 	if !diff.HasChanges() {
-		t.Fatal("expected changes, got none")
+		t.Fatal("expected changes")
+	}
+	if diff.DACLDiff == nil {
+		t.Fatal("DACLDiff is nil")
+	}
+
+	var foundRemoved bool
+	for _, d := range diff.DACLDiff.ACEDiffs {
+		if d.Type.Has(DiffRemoved) {
+			foundRemoved = true
+			if d.OldACE == nil {
+				t.Error("removed ACE diff has nil OldACE")
+			} else if d.OldACE.SID() == nil || d.OldACE.SID().Value != "S-1-1-0" {
+				t.Errorf("removed ACE SID = %v, want S-1-1-0", d.OldACE.SID())
+			}
+		}
+	}
+	if !foundRemoved {
+		t.Error("expected a DiffRemoved entry")
+	}
+}
+
+func TestCompare_ModifyMask(t *testing.T) {
+	before, err := Parse(loadFixture(t, "compare_modify_mask/before.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse before: %v", err)
+	}
+	after, err := Parse(loadFixture(t, "compare_modify_mask/after.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse after: %v", err)
+	}
+
+	diff := Compare(before, after)
+	if !diff.HasChanges() {
+		t.Fatal("expected changes")
 	}
 	if diff.DACLDiff == nil {
 		t.Fatal("DACLDiff is nil")
@@ -74,47 +103,21 @@ func TestCompare_RemovingFlag(t *testing.T) {
 			if d.OldACE.Mask() == d.NewACE.Mask() {
 				t.Error("modified ACE should have different masks")
 			}
+			if !d.OldACE.Mask().Has(RIGHT_DS_READ_PROPERTY) {
+				t.Error("old mask should have ReadProperty")
+			}
+			if d.NewACE.Mask().Has(RIGHT_DS_READ_PROPERTY) {
+				t.Error("new mask should not have ReadProperty")
+			}
 		}
 	}
 	if !foundModified {
-		t.Error("expected a DiffModified entry in DACLDiff")
-	}
-}
-
-func TestCompare_AddingFlag(t *testing.T) {
-	defaultData := loadTestData(t, "adding_flag/sd-filedomain_default.bin")
-	changeData := loadTestData(t, "adding_flag/sd-filedomain_change.bin")
-
-	defaultSD, err := Parse(defaultData, nil)
-	if err != nil {
-		t.Fatalf("Parse default: %v", err)
-	}
-	changeSD, err := Parse(changeData, nil)
-	if err != nil {
-		t.Fatalf("Parse change: %v", err)
-	}
-
-	diff := Compare(defaultSD, changeSD)
-	if !diff.HasChanges() {
-		t.Fatal("expected changes, got none")
-	}
-	if diff.DACLDiff == nil {
-		t.Fatal("DACLDiff is nil")
-	}
-
-	var foundModified bool
-	for _, d := range diff.DACLDiff.ACEDiffs {
-		if d.Type.Has(DiffModified) {
-			foundModified = true
-		}
-	}
-	if !foundModified {
-		t.Error("expected a DiffModified entry in DACLDiff")
+		t.Error("expected a DiffModified entry")
 	}
 }
 
 func TestCompare_Identical(t *testing.T) {
-	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -137,7 +140,7 @@ func TestCompare_NilACLs(t *testing.T) {
 }
 
 func TestCompare_NilOld(t *testing.T) {
-	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -149,7 +152,7 @@ func TestCompare_NilOld(t *testing.T) {
 }
 
 func TestCompare_NilNew(t *testing.T) {
-	data := loadTestData(t, "adding_new_user/sd-filedomain_default.bin")
+	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
