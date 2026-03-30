@@ -175,6 +175,63 @@ func TestCompareAccessRights_NilACEs(t *testing.T) {
 	}
 }
 
+func TestCompare_DuplicateIdentity(t *testing.T) {
+	// Before: SY(GA), AU(RP), AU(WP)
+	// After:  WD(Deny SD), SY(GA), AU(RP)
+	//
+	// The deny ACE shifts all positions so matchUnchanged finds nothing.
+	// The identity-based path must handle the two AU ACEs (same identity
+	// "0x00:S-1-5-11") without mispairing them.
+	before, err := Parse(loadFixture(t, "compare_duplicate_identity/before.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse before: %v", err)
+	}
+	after, err := Parse(loadFixture(t, "compare_duplicate_identity/after.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse after: %v", err)
+	}
+
+	diff := Compare(before, after)
+	if !diff.HasChanges() {
+		t.Fatal("expected changes")
+	}
+	if diff.DACLDiff == nil {
+		t.Fatal("DACLDiff is nil")
+	}
+
+	var added, removed, modified int
+	for _, d := range diff.DACLDiff.ACEDiffs {
+		if d.Type.Has(DiffAdded) {
+			added++
+		}
+		if d.Type.Has(DiffRemoved) {
+			removed++
+			if d.OldACE == nil {
+				t.Error("removed diff has nil OldACE")
+			} else if !d.OldACE.Mask().Has(RIGHT_DS_WRITE_PROPERTY) {
+				t.Errorf("removed ACE mask = %s, expected WriteProperty", d.OldACE.Mask())
+			}
+		}
+		if d.Type.Has(DiffModified) {
+			modified++
+			t.Errorf("unexpected DiffModified: old mask=%s new mask=%s (identity mispair?)",
+				d.OldACE.Mask(), d.NewACE.Mask())
+		}
+	}
+
+	// Correct: 1 added (deny ACE), 1 removed (WP ACE), 0 modified.
+	// SY(GA) and AU(RP) should be detected as reordered, not modified.
+	if added != 1 {
+		t.Errorf("added = %d, want 1", added)
+	}
+	if removed != 1 {
+		t.Errorf("removed = %d, want 1", removed)
+	}
+	if modified != 0 {
+		t.Errorf("modified = %d, want 0", modified)
+	}
+}
+
 func TestCompare_Identical(t *testing.T) {
 	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)

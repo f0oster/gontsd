@@ -3,7 +3,7 @@
     Generates binary security descriptor test fixtures for gontsd.
 
 .DESCRIPTION
-    Builds SDDL strings covering all 9 ACE types that Windows can produce,
+    Builds SDDL strings covering the ACE types supported by gontsd,
     converts them to binary via the Win32 API, and writes .bin files.
 
     Fixture coverage:
@@ -352,6 +352,37 @@ $ExportParams = @{ Sddl = $CompareModifyAfter; OutFile = Join-Path $OutputPath "
 Export-SddlFixture @ExportParams
 
 # ---------------------------------------------------------------------------
+# 8. compare_duplicate_identity -- two ACEs share type+SID but differ in mask,
+#    and a deny ACE is inserted at the front so no ACE matches by position.
+#    This forces the identity-based matching path.
+#
+# before DACL (3 ACEs):
+#   [0]  AccessAllowed   SYSTEM       GenericAll
+#   [1]  AccessAllowed   Auth Users   ReadProperty
+#   [2]  AccessAllowed   Auth Users   WriteProperty
+#
+# after DACL (3 ACEs):
+#   [0]  AccessDenied    Everyone     Delete
+#   [1]  AccessAllowed   SYSTEM       GenericAll
+#   [2]  AccessAllowed   Auth Users   ReadProperty
+#
+# The WP ACE is removed and a deny ACE is added. Because the deny ACE
+# shifts all positions, matchUnchanged finds no pairs. The identity-based
+# path must handle the two Auth Users ACEs (same identity "0x00:S-1-5-11")
+# without mispairing them.
+# ---------------------------------------------------------------------------
+
+Write-Host "`n=== compare_duplicate_identity ===" -ForegroundColor Cyan
+
+$CompareDupBefore = @("O:SYG:SYD:(A;;GA;;;SY)(A;;RP;;;AU)(A;;WP;;;AU)") -join ""
+$CompareDupAfter  = @("O:SYG:SYD:(D;;SD;;;WD)(A;;GA;;;SY)(A;;RP;;;AU)") -join ""
+
+$ExportParams = @{ Sddl = $CompareDupBefore; OutFile = Join-Path $OutputPath "compare_duplicate_identity\before.bin" }
+Export-SddlFixture @ExportParams
+$ExportParams = @{ Sddl = $CompareDupAfter; OutFile = Join-Path $OutputPath "compare_duplicate_identity\after.bin" }
+Export-SddlFixture @ExportParams
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 
@@ -365,3 +396,4 @@ Write-Host "  all_ace_types/sd.bin              All 9 ACE types on one descripto
 Write-Host "  compare_add_ace/before|after.bin  ACE added between snapshots"
 Write-Host "  compare_remove_ace/before|after.bin  ACE removed between snapshots"
 Write-Host "  compare_modify_mask/before|after.bin  ACE mask changed between snapshots"
+Write-Host "  compare_duplicate_identity/before|after.bin  Two ACEs with same type+SID, one removed"
