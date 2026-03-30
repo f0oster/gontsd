@@ -116,6 +116,65 @@ func TestCompare_ModifyMask(t *testing.T) {
 	}
 }
 
+func TestCompareAccessRights(t *testing.T) {
+	before, err := Parse(loadFixture(t, "compare_modify_mask/before.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse before: %v", err)
+	}
+	after, err := Parse(loadFixture(t, "compare_modify_mask/after.bin"), nil)
+	if err != nil {
+		t.Fatalf("Parse after: %v", err)
+	}
+
+	diff := Compare(before, after)
+	if diff.DACLDiff == nil {
+		t.Fatal("DACLDiff is nil")
+	}
+
+	for _, d := range diff.DACLDiff.ACEDiffs {
+		if !d.Type.Has(DiffModified) {
+			continue
+		}
+		added, removed, unchanged := d.CompareAccessRights()
+		if len(removed) == 0 {
+			t.Error("expected removed rights")
+		}
+		if len(unchanged) == 0 {
+			t.Error("expected unchanged rights")
+		}
+		// The before mask has RC+RP+WP, after has only RC.
+		// So RP and WP should be removed, RC should be unchanged.
+		removedSet := make(map[string]bool)
+		for _, r := range removed {
+			removedSet[r] = true
+		}
+		if !removedSet["RIGHT_DS_READ_PROPERTY"] {
+			t.Errorf("removed = %v, expected RIGHT_DS_READ_PROPERTY", removed)
+		}
+		if !removedSet["RIGHT_DS_WRITE_PROPERTY"] {
+			t.Errorf("removed = %v, expected RIGHT_DS_WRITE_PROPERTY", removed)
+		}
+		unchangedSet := make(map[string]bool)
+		for _, u := range unchanged {
+			unchangedSet[u] = true
+		}
+		if !unchangedSet["RIGHT_READ_CONTROL"] {
+			t.Errorf("unchanged = %v, expected RIGHT_READ_CONTROL", unchanged)
+		}
+		if len(added) != 0 {
+			t.Errorf("added = %v, expected none", added)
+		}
+	}
+}
+
+func TestCompareAccessRights_NilACEs(t *testing.T) {
+	d := ACEDiff{OldACE: nil, NewACE: nil}
+	added, removed, unchanged := d.CompareAccessRights()
+	if added != nil || removed != nil || unchanged != nil {
+		t.Error("expected all nil for nil ACEs")
+	}
+}
+
 func TestCompare_Identical(t *testing.T) {
 	data := loadFixture(t, "object_aces/sd.bin")
 	sd, err := Parse(data, nil)

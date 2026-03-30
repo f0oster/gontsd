@@ -51,3 +51,26 @@ func TestACEFlags_Has(t *testing.T) {
 		t.Error("Has(CONTAINER_INHERIT_ACE) should be false")
 	}
 }
+
+func TestACEFlags_String(t *testing.T) {
+	t.Run("Single", func(t *testing.T) {
+		s := INHERITED_ACE.String()
+		if s != "INHERITED_ACE" {
+			t.Errorf("String() = %q, want INHERITED_ACE", s)
+		}
+	})
+
+	t.Run("Multiple", func(t *testing.T) {
+		s := (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE).String()
+		if s != "OBJECT_INHERIT_ACE|CONTAINER_INHERIT_ACE" {
+			t.Errorf("String() = %q, want OBJECT_INHERIT_ACE|CONTAINER_INHERIT_ACE", s)
+		}
+	})
+
+	t.Run("Zero", func(t *testing.T) {
+		s := ACEFlags(0).String()
+		if s != "0x00" {
+			t.Errorf("String() = %q, want 0x00", s)
+		}
+	})
+}
