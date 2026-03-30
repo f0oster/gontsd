@@ -1,6 +1,7 @@
 package gontsd
 
 import (
+	"encoding/binary"
 	"strings"
 	"testing"
 )
@@ -116,6 +117,24 @@ func TestParse_Errors(t *testing.T) {
 				t.Error("Parse() expected error, got nil")
 			}
 		})
+	}
+}
+
+func TestParse_TruncatedACLHeader(t *testing.T) {
+	// DACL offset points near the end of the descriptor, leaving less
+	// than 8 bytes for the ACL header. This should not panic.
+	data := make([]byte, 24)
+	data[0] = 1                                              // revision
+	binary.LittleEndian.PutUint16(data[2:4], 0x8004)        // SE_DACL_PRESENT | SE_SELF_RELATIVE
+	binary.LittleEndian.PutUint32(data[16:20], uint32(23))   // daclOffset = 23, only 1 byte left
+
+	sd, err := Parse(data, nil)
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+	// DACL should be silently skipped, not panic.
+	if sd.DACL != nil {
+		t.Error("DACL should be nil when offset leaves insufficient room for ACL header")
 	}
 }
 

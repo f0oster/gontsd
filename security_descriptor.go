@@ -63,7 +63,7 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		daclOffset:   binary.LittleEndian.Uint32(descriptor[16:20]),
 	}
 
-	if sd.daclOffset > 0 && int(sd.daclOffset) < len(descriptor) {
+	if sd.daclOffset > 0 && int(sd.daclOffset)+8 <= len(descriptor) {
 		dacl := &ACL{
 			Revision: descriptor[sd.daclOffset],
 			sbz1:     descriptor[sd.daclOffset+1],
@@ -84,7 +84,7 @@ func parseSecurityDescriptor(descriptor []byte) (*SecurityDescriptor, error) {
 		sd.DACL = dacl
 	}
 
-	if sd.saclOffset > 0 && int(sd.saclOffset) < len(descriptor) {
+	if sd.saclOffset > 0 && int(sd.saclOffset)+8 <= len(descriptor) {
 		sacl := &ACL{
 			Revision: descriptor[sd.saclOffset],
 			sbz1:     descriptor[sd.saclOffset+1],
