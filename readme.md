@@ -2,25 +2,17 @@
 
 A pure Go library for parsing, comparing, and resolving Windows NT Security Descriptors.
 
-This library is designed around parsing Active Directory's `ntSecurityDescriptor` attribute, but any binary based security descriptor that follows the [MS-DTYP](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/) standard should work for parsing and comparison.
-
-Currently, there is no support for SDDL in the library. It may be added later.
-
+Built for Active Directory's `ntSecurityDescriptor` attribute. Binary security descriptors from other sources (ie: NTFS permissions, registry) will parse if they follow [MS-DTYP], but ACE type coverage is focused on AD - see [ACE type support](#ace-type-support) for details.
 
 ## Quick start
 
 ```go
-// Parse a binary security descriptor and resolve object names using the default, non-LDAP connected resolver.
-// The default resolver covers well-known SIDs and common AD schema GUIDs.
-// For Active Directory security descriptors, use gontsd.NewLDAPResolver()
-// instead for full domain-specific resolution - see the Resolution section.
 r := gontsd.NewResolver()
 sd, err := gontsd.Parse(data, r)
 if err != nil {
     log.Fatal(err)
 }
 
-// Display the owner and each ACE in the DACL
 fmt.Println("Owner:", sd.OwnerSID.Resolved())
 for _, ace := range sd.DACL.ACEs {
     fmt.Printf("  %s %s %s\n", ace.Type(), ace.SID().Resolved(), ace.Mask())
@@ -32,10 +24,10 @@ Output:
 Owner: BUILTIN\Administrators (S-1-5-32-544)
   AccessDenied Everyone (S-1-1-0) RIGHT_DS_DELETE_CHILD
   AccessAllowed Everyone (S-1-1-0) RIGHT_DS_READ_PROPERTY
-  AccessAllowedObject Domain Admins (S-1-5-21-...-512) RIGHT_DS_CONTROL_ACCESS
+  AccessAllowedObject S-1-5-21-3623811015-3361044348-30300820-1013 RIGHT_DS_CONTROL_ACCESS
 ```
 
-To resolve SIDs and GUIDs that are not a part of the Well-Known SID or Object lists, such as objects and GUIDs unique to a domain, you must pass an LDAP-backed resolver instead of `NewResolver()` - see [Resolution](#resolution) below.
+`NewResolver()` covers well-known SIDs and common AD schema GUIDs. Domain-specific SIDs (like the one above) require an LDAP-backed resolver - see [Resolution](#resolution). When resolution misses, `SID.Resolved()` and `GUID.Resolved()` fall back to the raw string value silently; no error is returned.
 
 ## Install
 
@@ -52,6 +44,8 @@ sd, err := gontsd.Parse(data, nil) // no resolution
 sd, err := gontsd.Parse(data, r)   // with resolution
 ```
 
+`Parse` returns an error on malformed input - truncated headers, invalid offsets, ACE size mismatches, or data too short for declared structures. All variable-length fields are bounds-checked. It does not return partial results: either the full descriptor parses successfully or it fails.
+
 The returned `SecurityDescriptor` contains:
 
 - `OwnerSID`, `GroupSID` - who owns the object
@@ -62,12 +56,13 @@ The returned `SecurityDescriptor` contains:
 Each ACE in the DACL/SACL exposes:
 
 ```go
-ace.Type()                  // AccessAllowed, AccessDenied, AccessAllowedObject, etc.
-ace.SID()                   // the trustee (who this ACE applies to)
-ace.Mask()                  // what permissions are granted/denied
-ace.AceFlags()              // inheritance and audit flags
-ace.ObjectTypeGUID()        // which schema property/right this applies to (object ACEs only)
-ace.InheritedObjectTypeGUID() // which child class inherits this ACE
+ace.Type()                     // AccessAllowed, AccessDenied, AccessAllowedObject, etc.
+ace.SID()                      // the trustee (who this ACE applies to)
+ace.Mask()                     // what permissions are granted/denied
+ace.AceFlags()                 // inheritance and audit flags
+ace.ObjectTypeGUID()           // schema property/right this applies to (object ACEs only, nil otherwise)
+ace.InheritedObjectTypeGUID()  // child class that inherits this ACE (object ACEs only, nil otherwise)
+ace.ApplicationData()          // conditional expression bytes (callback ACEs only, nil otherwise)
 ```
 
 When parsed with a resolver, SIDs and GUIDs gain a `.Resolved()` method that returns human-readable names. `.String()` always returns the raw value:
@@ -90,6 +85,36 @@ ace.Mask().Has(gontsd.RIGHT_DS_CONTROL_ACCESS) // true/false
 ace.AceFlags().Has(gontsd.INHERITED_ACE)       // true/false
 ace.Mask().Names()                              // []string{"RIGHT_DS_READ_PROPERTY", ...}
 ```
+
+## ACE type support
+
+### Core ACE types
+
+These ACE types are fully parsed into typed structs. The parser validates the ACE header, access mask, and SID, and for object ACE variants also validates and extracts ObjectType and InheritedObjectType according to the variable-length layout indicated by the ACE flags. Inheritance and audit flags are preserved. SIDs and GUIDs are resolved when a resolver is available.
+
+| Byte | Type |
+|------|------|
+| 0x00 | ACCESS_ALLOWED |
+| 0x01 | ACCESS_DENIED |
+| 0x02 | SYSTEM_AUDIT |
+| 0x05 | ACCESS_ALLOWED_OBJECT |
+| 0x06 | ACCESS_DENIED_OBJECT |
+| 0x07 | SYSTEM_AUDIT_OBJECT |
+
+### Callback ACE types
+
+These callback ACE types receive the same structural parsing and validation. ApplicationData offset and length are validated against the ACE size, and the trailing bytes are exposed as raw data. The conditional expression encoded in ApplicationData is not interpreted.
+
+| Byte | Type |
+|------|------|
+| 0x09 | ACCESS_ALLOWED_CALLBACK |
+| 0x0A | ACCESS_DENIED_CALLBACK |
+| 0x0B | ACCESS_ALLOWED_CALLBACK_OBJECT |
+| 0x0C | ACCESS_DENIED_CALLBACK_OBJECT |
+
+### Fallback (RawACE)
+
+All other ACE types fall back to `RawACE`. `RawACE` stores the original ACE bytes unchanged. It also performs a best-effort extraction of header, access mask, and SID using the standard access-allowed ACE layout. The header is always reliable. For ACE types with a different layout, extracted mask and SID fields may be unset.
 
 ## Comparing
 
@@ -117,11 +142,11 @@ if diff.DACLDiff != nil {
 }
 ```
 
-`DiffType` is a bitmask - an ACE that is both modified and moved will have `DiffModified | DiffReordered` set.
+`DiffType` is a bitmask - an ACE that is both modified and moved will have `DiffModified | DiffReordered` set. Comparison matches ACEs by identity (type + SID + ObjectTypeGUID), then detects position changes. `DiffReordered` means the ACE moved index but is otherwise identical.
 
 ## Resolution
 
-`NewResolver()` uses built-in tables to resolve common SIDs and schema GUIDs without needing to query the LDAP directory. It covers:
+`NewResolver()` resolves common SIDs and schema GUIDs from built-in lookup tables. It covers:
 
 - **Well-known SIDs** - `BUILTIN\Administrators`, `Domain Admins`, `Everyone`, `Local System`, etc.
 - **Extended rights** - `User-Force-Change-Password`, `DS-Replication-Get-Changes-All` (DCSync), `Certificate-Enrollment`, etc.
@@ -132,7 +157,7 @@ if diff.DACLDiff != nil {
 
 Domain-specific accounts, custom schema extensions, and GUIDs not in the built-in tables require LDAP resolution.
 
-For full resolution against Active Directory, use `NewLDAPResolver`:
+For full resolution against AD, use `NewLDAPResolver`:
 
 ```go
 client, err := gontsd.NewLDAPClient(gontsd.LDAPConfig{
@@ -154,16 +179,18 @@ if err != nil {
 sd, err := gontsd.Parse(data, r)
 ```
 
-Resolution is automatic - `Parse` batch-resolves all SIDs upfront and stores the resolver on each SID and GUID. The results flow through `Compare` too, since the diff references the same SID/GUID pointers from the parsed descriptors.
+When using an LDAP resolver, `Parse` collects all unique SIDs from the descriptor and resolves them in batched LDAP queries. Schema GUIDs are resolved individually but the LDAP schema GUID resolver preloads classes, attributes, and extended rights when it's created, so most lookups are served from cache.
 
-The built-in LDAP resolvers use [go-ldap](https://github.com/go-ldap/ldap). If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces and pass them to `NewResolverWith`:
+Resolution results flow through `Compare` too, since the diff references the same SID/GUID objects from the parsed descriptors.
+
+The built-in LDAP resolvers use [go-ldap]. If your project uses a different LDAP client, implement the `SIDResolver` and `SchemaGUIDResolver` interfaces and pass them to `NewResolverWith`:
 
 ```go
 r := gontsd.NewResolverWith(myCustomSIDResolver{}, myCustomGUIDResolver{})
 sd, err := gontsd.Parse(data, r)
 ```
 
-This chains the built-in well-known tables with your custom resolvers, so well-known SIDs and GUIDs resolve instantly and everything else falls through to your implementation.
+This chains the built-in well-known tables with your custom resolvers, so well-known SIDs and schema GUIDs resolve instantly and everything else falls through to your implementation.
 
 ## Examples
 
@@ -189,7 +216,7 @@ go run ./examples/dump \
 | `Compare(old, new)` | Diff two security descriptors |
 | `NewResolver()` | Create a resolver using built-in well-known tables |
 | `NewResolverWith(sids, guids)` | Create a resolver chaining built-in tables with custom resolvers |
-| `NewLDAPResolver(client)` | Create a resolver backed by Active Directory |
+| `NewLDAPResolver(client)` | Create a resolver backed by AD |
 | `NewLDAPClient(config)` | Establish an LDAP connection for use with `NewLDAPResolver` |
 
 ### Types
@@ -227,10 +254,16 @@ All have `Has(flag)`, `Names()`, and `String()` methods.
 
 ## References
 
-- [MS-DTYP: Security Descriptor Structures](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/) - the ntSecurityDescriptor binary format
-- [Well-known SIDs](https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids) - built-in Windows security identifiers
-- [Extended Rights Reference](https://learn.microsoft.com/en-us/windows/win32/adschema/extended-rights) - AD Control Access Rights
-- [Control Access Rights](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb) - MS-ADTS specification for extended rights and validated writes
+- [MS-DTYP][MS-DTYP] - Microsoft data type specification defining the binary format for security descriptors, ACLs, ACEs, and SIDs
+- [Well-known SIDs][well-known-sids] - Microsoft reference for built-in security identifiers across Windows
+- [Extended Rights Reference][extended-rights] - AD schema reference for extended rights and their GUIDs
+- [Control Access Rights][control-access-rights] - MS-ADTS specification for how extended rights, validated writes, and property sets map to object ACE GUIDs
+
+[MS-DTYP]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/
+[go-ldap]: https://github.com/go-ldap/ldap
+[well-known-sids]: https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+[extended-rights]: https://learn.microsoft.com/en-us/windows/win32/adschema/extended-rights
+[control-access-rights]: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb
 
 ## License
 
